@@ -1,0 +1,477 @@
+const DMM_PREFIX = "https://play.games.dmm.com/game/kancolle";
+const KANCOLLE_HOST_SUFFIX = ".kancolle-server.com";
+const API_PREFIX = "/kcsapi/";
+const PLUGIN_BASE = "http://127.0.0.1:8891";
+const MAX_CAPTURES = 40;
+
+const tabState = new Map();
+const disabledTabs = new Set();
+
+let pluginState = {
+  status: "unknown",
+  sent: 0,
+  accepted: 0,
+  lastError: null,
+  lastHealth: null,
+  updatedAt: null
+};
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function isGamePage(url) {
+  return typeof url === "string" && url.startsWith(DMM_PREFIX);
+}
+
+function parseApiUrl(url) {
+  try {
+    const u = new URL(url);
+    const hostOk =
+      u.hostname === "kancolle-server.com" ||
+      u.hostname.endsWith(KANCOLLE_HOST_SUFFIX);
+
+    if (!hostOk || !u.pathname.startsWith(API_PREFIX)) return null;
+
+    return {
+      path: u.pathname,
+      queryString: u.search || ""
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function stateFor(tabId) {
+  if (!tabState.has(tabId)) {
+    tabState.set(tabId, {
+      attached: false,
+      requests: new Map(),
+      sessions: new Set(),
+      captureCount: 0,
+      lastCapture: null,
+      lastError: null,
+      updatedAt: nowIso()
+    });
+  }
+  return tabState.get(tabId);
+}
+
+function sourceKey(source, requestId) {
+  return `${source.sessionId || "root"}:${requestId}`;
+}
+
+function sourceToDebuggee(source) {
+  const d = { tabId: source.tabId };
+  if (source.sessionId) d.sessionId = source.sessionId;
+  return d;
+}
+
+async function setBadge(tabId, text) {
+  try {
+    await chrome.action.setBadgeText({ tabId, text });
+  } catch (_) {}
+}
+
+async function saveState() {
+  const tabs = {};
+  for (const [tabId, s] of tabState.entries()) {
+    tabs[String(tabId)] = {
+      attached: s.attached,
+      captureCount: s.captureCount,
+      lastCapture: s.lastCapture,
+      lastError: s.lastError,
+      updatedAt: s.updatedAt
+    };
+  }
+  pluginState.updatedAt = nowIso();
+  await chrome.storage.local.set({ pocTabs: tabs, pluginState });
+}
+
+async function appendCapture(tabId, capture) {
+  const s = stateFor(tabId);
+  s.captureCount += 1;
+  s.lastCapture = capture;
+  s.updatedAt = nowIso();
+
+  const { captures = [] } = await chrome.storage.local.get("captures");
+  captures.unshift(capture);
+  captures.splice(MAX_CAPTURES);
+  await chrome.storage.local.set({ captures });
+
+  await setBadge(tabId, String(Math.min(s.captureCount, 99)));
+  await saveState();
+}
+
+async function recordTabError(tabId, e) {
+  const s = stateFor(tabId);
+  s.lastError = String(e?.message || e);
+  s.updatedAt = nowIso();
+  await setBadge(tabId, "!");
+  await saveState();
+}
+
+async function pluginHealth() {
+  try {
+    const r = await fetch(PLUGIN_BASE + "/health", { cache: "no-store" });
+    const text = await r.text();
+    if (!r.ok || !text.startsWith("OK ")) {
+      throw new Error(`HTTP ${r.status}: ${text}`);
+    }
+    pluginState.status = "connected";
+    pluginState.lastHealth = text;
+    pluginState.lastError = null;
+    const m = text.match(/\baccepted=(\d+)/);
+    if (m) pluginState.accepted = Number(m[1]);
+    await saveState();
+    return true;
+  } catch (e) {
+    pluginState.status = "disconnected";
+    pluginState.lastError = String(e?.message || e);
+    await saveState();
+    return false;
+  }
+}
+
+function putString(view, bytes, offset, text) {
+  const b = new TextEncoder().encode(text || "");
+  view.setUint32(offset, b.length, false);
+  bytes.set(b, offset + 4);
+  return offset + 4 + b.length;
+}
+
+function encodePacket(info, postData, responseBody) {
+  const enc = new TextEncoder();
+  const fields = [
+    info.method || "",
+    info.path || "",
+    info.queryString || "",
+    postData || "",
+    responseBody || ""
+  ].map(s => enc.encode(s));
+
+  let total = 4 + 4 + 8;
+  for (const b of fields) total += 4 + b.length;
+
+  const buffer = new ArrayBuffer(total);
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+
+  view.setUint32(0, 0x4B435031, false); // KCP1
+  view.setUint32(4, 1, false);
+  view.setBigUint64(8, BigInt(Date.now()), false);
+
+  let off = 16;
+  for (const b of fields) {
+    view.setUint32(off, b.length, false);
+    off += 4;
+    bytes.set(b, off);
+    off += b.length;
+  }
+
+  return buffer;
+}
+
+async function sendDirect(info, postData, responseBody) {
+  try {
+    const body = encodePacket(info, postData, responseBody);
+    const r = await fetch(PLUGIN_BASE + "/ingest", {
+      method: "POST",
+      headers: { "Content-Type": "application/octet-stream" },
+      body
+    });
+    const text = await r.text();
+
+    if (!r.ok || text.trim() !== "ok") {
+      throw new Error(`HTTP ${r.status}: ${text}`);
+    }
+
+    pluginState.status = "connected";
+    pluginState.sent += 1;
+    pluginState.lastError = null;
+    pluginHealth().catch(() => {});
+    return true;
+  } catch (e) {
+    pluginState.status = "error";
+    pluginState.lastError = String(e?.message || e);
+    await saveState();
+    return false;
+  }
+}
+
+async function enableNetwork(debuggee) {
+  await chrome.debugger.sendCommand(debuggee, "Network.enable", {
+    maxTotalBufferSize: 32 * 1024 * 1024,
+    maxResourceBufferSize: 16 * 1024 * 1024,
+    maxPostDataSize: 4 * 1024 * 1024
+  });
+}
+
+async function enableAutoAttach(debuggee) {
+  await chrome.debugger.sendCommand(debuggee, "Target.setAutoAttach", {
+    autoAttach: true,
+    waitForDebuggerOnStart: false,
+    flatten: true,
+    filter: [{ type: "iframe", exclude: false }]
+  });
+}
+
+async function attachTab(tabId) {
+  if (disabledTabs.has(tabId)) return;
+  const s = stateFor(tabId);
+  if (s.attached) return;
+
+  try {
+    await chrome.debugger.attach({ tabId }, "1.3");
+    s.attached = true;
+    s.lastError = null;
+    s.updatedAt = nowIso();
+    await setBadge(tabId, "ON");
+
+    await enableNetwork({ tabId });
+    await enableAutoAttach({ tabId });
+    pluginHealth().catch(() => {});
+    await saveState();
+  } catch (e) {
+    await recordTabError(tabId, e);
+  }
+}
+
+async function detachTab(tabId, disableUntilReload = true) {
+  if (disableUntilReload) disabledTabs.add(tabId);
+  const s = stateFor(tabId);
+
+  try {
+    if (s.attached) await chrome.debugger.detach({ tabId });
+  } catch (_) {}
+
+  s.attached = false;
+  s.requests.clear();
+  s.sessions.clear();
+  s.updatedAt = nowIso();
+  await setBadge(tabId, "");
+  await saveState();
+}
+
+async function scanTabs() {
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    if (tab.id && isGamePage(tab.url || "")) {
+      await attachTab(tab.id);
+    }
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  scanTabs().catch(() => {});
+  pluginHealth().catch(() => {});
+});
+
+chrome.runtime.onStartup.addListener(() => {
+  scanTabs().catch(() => {});
+  pluginHealth().catch(() => {});
+});
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.url || changeInfo.status === "complete") {
+    if (isGamePage(tab.url || "")) {
+      if (changeInfo.url) disabledTabs.delete(tabId);
+      attachTab(tabId).catch(() => {});
+    } else {
+      const s = tabState.get(tabId);
+      if (s?.attached) detachTab(tabId, false).catch(() => {});
+    }
+  }
+});
+
+chrome.tabs.onRemoved.addListener((tabId) => {
+  tabState.delete(tabId);
+  disabledTabs.delete(tabId);
+  saveState().catch(() => {});
+});
+
+chrome.debugger.onDetach.addListener((source, reason) => {
+  if (!source.tabId) return;
+  const s = stateFor(source.tabId);
+  s.attached = false;
+  s.requests.clear();
+  s.sessions.clear();
+  s.lastError = `detached: ${reason}`;
+  s.updatedAt = nowIso();
+  setBadge(source.tabId, "").catch(() => {});
+  saveState().catch(() => {});
+});
+
+chrome.debugger.onEvent.addListener(async (source, method, params) => {
+  if (!source.tabId) return;
+  const s = stateFor(source.tabId);
+
+  try {
+    if (method === "Target.attachedToTarget") {
+      const child = { tabId: source.tabId, sessionId: params.sessionId };
+      s.sessions.add(params.sessionId);
+      await enableNetwork(child);
+      try { await enableAutoAttach(child); } catch (_) {}
+      return;
+    }
+
+    if (method === "Target.detachedFromTarget") {
+      if (params.sessionId) s.sessions.delete(params.sessionId);
+      return;
+    }
+
+    if (method === "Network.requestWillBeSent") {
+      const req = params.request || {};
+      const api = parseApiUrl(req.url || "");
+      if (!api) return;
+
+      s.requests.set(sourceKey(source, params.requestId), {
+        requestId: params.requestId,
+        method: req.method || "",
+        path: api.path,
+        queryString: api.queryString,
+        postData: typeof req.postData === "string" ? req.postData : "",
+        status: null
+      });
+      return;
+    }
+
+    if (method === "Network.responseReceived") {
+      const info = s.requests.get(sourceKey(source, params.requestId));
+      if (info) info.status = params.response?.status ?? null;
+      return;
+    }
+
+    if (method === "Network.loadingFailed") {
+      s.requests.delete(sourceKey(source, params.requestId));
+      return;
+    }
+
+    if (method === "Network.loadingFinished") {
+      const key = sourceKey(source, params.requestId);
+      const info = s.requests.get(key);
+      if (!info) return;
+      s.requests.delete(key);
+
+      const debuggee = sourceToDebuggee(source);
+
+      let postData = info.postData;
+      if (info.method === "POST" && !postData) {
+        try {
+          const p = await chrome.debugger.sendCommand(
+            debuggee,
+            "Network.getRequestPostData",
+            { requestId: params.requestId }
+          );
+          postData = p?.postData || "";
+        } catch (_) {}
+      }
+
+      try {
+        const result = await chrome.debugger.sendCommand(
+          debuggee,
+          "Network.getResponseBody",
+          { requestId: params.requestId }
+        );
+
+        if (result?.base64Encoded) {
+          throw new Error("unexpected base64 API response");
+        }
+
+        const responseBody = result?.body || "";
+        const direct = await sendDirect(info, postData, responseBody);
+
+        await appendCapture(source.tabId, {
+          at: nowIso(),
+          method: info.method,
+          path: info.path,
+          httpStatus: info.status,
+          postDataBytes: postData.length,
+          responseBytes: responseBody.length,
+          looksLikeSvdata: responseBody.startsWith("svdata="),
+          session: source.sessionId ? "iframe" : "root",
+          direct
+        });
+      } catch (e) {
+        await recordTabError(
+          source.tabId,
+          `direct ${info.path}: ${e.message || e}`
+        );
+      }
+    }
+  } catch (e) {
+    await recordTabError(source.tabId, e);
+  }
+});
+
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  (async () => {
+    if (message?.type === "status") {
+      await pluginHealth().catch(() => {});
+      const [active] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+      const { captures = [], pocTabs = {}, pluginState: saved = {} } =
+        await chrome.storage.local.get(["captures", "pocTabs", "pluginState"]);
+
+      sendResponse({
+        ok: true,
+        activeTab: active ? {
+          id: active.id,
+          isGame: isGamePage(active.url || "")
+        } : null,
+        activeState: active?.id ? pocTabs[String(active.id)] || null : null,
+        captures,
+        pluginState: saved
+      });
+      return;
+    }
+
+    if (message?.type === "startActive") {
+      const [active] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+      if (!active?.id || !isGamePage(active.url || "")) {
+        sendResponse({ ok: false, error: "艦これのDMMタブを前面にしてください。" });
+        return;
+      }
+      disabledTabs.delete(active.id);
+      await attachTab(active.id);
+      sendResponse({ ok: true });
+      return;
+    }
+
+    if (message?.type === "stopActive") {
+      const [active] = await chrome.tabs.query({
+        active: true,
+        currentWindow: true
+      });
+      if (active?.id) await detachTab(active.id, true);
+      sendResponse({ ok: true });
+      return;
+    }
+
+    if (message?.type === "health") {
+      const ok = await pluginHealth();
+      sendResponse({ ok, pluginState });
+      return;
+    }
+
+    if (message?.type === "clearCaptures") {
+      await chrome.storage.local.set({ captures: [] });
+      sendResponse({ ok: true });
+      return;
+    }
+
+    sendResponse({ ok: false, error: "unknown message" });
+  })().catch(e => {
+    sendResponse({ ok: false, error: String(e?.message || e) });
+  });
+
+  return true;
+});
+
+scanTabs().catch(() => {});
+pluginHealth().catch(() => {});
