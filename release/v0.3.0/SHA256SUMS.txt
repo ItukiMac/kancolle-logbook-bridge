@@ -1,0 +1,3 @@
+488aed1a4762f3bebd58385676ccd7ffa38e77676febd0db02be445bbc9be66d  logbook-kai-cdp-bridge-v0.3.0.zip
+12cb488d4968443d84e543e27784e2ce2e5b54d286cbfae2be82bc959ab0a344  logbook-kai-cdp-bridge-extension-v0.3.0.zip
+5361d3a1d7cbe23390ac425c11d40e078b16b743ed4e7eff67eb788d390a69b7  kancolle-cdp-bridge-plugin-v0.3.0.jar
