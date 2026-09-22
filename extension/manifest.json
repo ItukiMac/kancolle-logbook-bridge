@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "艦これ CDP → 航海日誌改 Direct PoC",
+  "version": "0.3.0",
+  "description": "艦これの/kcsapi/をCDPで取得し、localhostの航海日誌改プラグインへ直接渡すPoCです。",
+  "minimum_chrome_version": "125",
+  "permissions": [
+    "debugger",
+    "tabs",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8891/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "艦これ Direct PoC",
+    "default_popup": "popup.html"
+  }
+}
