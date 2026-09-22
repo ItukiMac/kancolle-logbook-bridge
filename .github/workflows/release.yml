@@ -1,0 +1,93 @@
+name: Build and publish release
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - release/RELEASE
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-publish
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Read release version
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < release/RELEASE)"
+          test -n "$VERSION"
+          test -f "release/v$VERSION/RELEASE_NOTES.md"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Download logbook-kai build dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .upstream-logbook
+          curl -fL             -o .upstream-logbook/logbook-kai.zip             https://github.com/sakura0689/logbook-kai/releases/download/v25.0.8/logbook-kai_25.0.8.zip
+          unzip -q .upstream-logbook/logbook-kai.zip -d .upstream-logbook/extracted
+          LOGBOOK_JAR="$(find .upstream-logbook/extracted -type f -name logbook-kai.jar -print -quit)"
+          test -n "$LOGBOOK_JAR"
+          echo "LOGBOOK_JAR=$LOGBOOK_JAR" >> "$GITHUB_ENV"
+
+      - name: Build release assets
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/build-release.sh
+          ./scripts/build-release.sh
+
+      - name: Verify release assets
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          test -f "dist/logbook-kai-cdp-bridge-v$VERSION.zip"
+          test -f "dist/logbook-kai-cdp-bridge-extension-v$VERSION.zip"
+          test -f "dist/kancolle-cdp-bridge-plugin-v$VERSION.jar"
+          test -f "dist/SHA256SUMS-v$VERSION.txt"
+          (
+            cd dist
+            sha256sum -c "SHA256SUMS-v$VERSION.txt"
+          )
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          set -euo pipefail
+          NOTES="release/v$VERSION/RELEASE_NOTES.md"
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release edit "$TAG"               --title "$TAG"               --notes-file "$NOTES"
+          else
+            gh release create "$TAG"               --target "$GITHUB_SHA"               --title "$TAG"               --notes-file "$NOTES"
+          fi
+
+          gh release upload "$TAG" --clobber             "dist/logbook-kai-cdp-bridge-v$VERSION.zip"             "dist/logbook-kai-cdp-bridge-extension-v$VERSION.zip"             "dist/kancolle-cdp-bridge-plugin-v$VERSION.jar"             "dist/SHA256SUMS-v$VERSION.txt"
