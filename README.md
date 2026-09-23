@@ -1,7 +1,7 @@
 # logbook-kai-cdp-bridge
 
 Chrome DevTools の `logbook-kai` パネルや `logbook-kai-messageflow.jar` を常用せず、
-Chrome の `chrome.debugger` / Chrome DevTools Protocol (CDP) で取得した艦これ API 通信を、
+Chrome の `chrome.debugger` / Chrome DevTools Protocol (CDP) で取得した艦これ API・画像・JSON通信を、
 航海日誌改 (`logbook-kai`) のプラグインへ直接渡すためのブリッジです。
 
 ## 位置づけ
@@ -50,6 +50,24 @@ logbook-kai plugin
 
 `logbook-kai-messageflow.jar` および TCP/8890 は通常運用では不要です。
 
+## MessageFlow互換の取得対象
+
+v0.4.0 では旧MessageFlowが扱っていた以下をDirect Bridgeで扱います。
+
+```text
+/kcsapi/
+/kcs2/resources/ship/
+/kcs2/resources/map/
+/kcs2/resources/gauge/
+/kcs2/img/common/
+/kcs2/img/duty/
+/kcs2/img/sally/
+```
+
+`/kcs2/` の画像はCDPからBase64形式で受け取りプラグイン側でバイナリへ復元し、
+JSONはUTF-8テキストとして航海日誌改の既存 `ImageListener` へ渡します。
+画像保存・スプライト分解は航海日誌改本体の既存処理を利用します。
+
 ## 現在確認できている状態
 
 2026-09 時点の検証環境:
@@ -64,6 +82,7 @@ logbook-kai plugin
 - `logbook-kai-messageflow.jar` を停止した状態で航海日誌改の更新を確認
 - プラグイン受信口は localhost のみ
 - Chrome を `--silent-debugger-extension-api` 付きで起動し、debugger 警告表示を抑止できることを確認
+- v0.4.0で旧MessageFlow相当の `/kcs2/` 画像・JSON経路を実装
 
 詳細は `docs/STATUS.md` を参照してください。
 
@@ -82,7 +101,12 @@ docs/DESIGN.md      構成と責務
 コンパイル時クラスパスとして参照し、生成したプラグインJARを
 `$HOME/logbook-kai/plugins/` へ配置します。
 
-既存ファイルを上書きしないよう、同名のPoC JARが存在する場合は停止します。
+Release版JARには以下のマニフェスト情報を付与します。
+
+- Name: Kancolle CDP Bridge
+- Vendor: ItukiMac
+- Version: リリースバージョン
+- License: MIT
 
 Chrome側は `extension/` を `chrome://extensions` の
 「パッケージ化されていない拡張機能を読み込む」から読み込みます。
@@ -91,7 +115,7 @@ Chrome側は `extension/` を `chrome://extensions` の
 
 - 艦これサーバーへ追加通信を送るための機能ではありません。
 - Cookie は保存・転送しません。
-- PoC の履歴には POST 本文・レスポンス本文を保存しません。
+- 履歴には POST 本文・レスポンス本文を保存しません。
 - `chrome.debugger` は強い権限です。ソースを確認したうえで使用してください。
 - `--silent-debugger-extension-api` は Chrome プロセス全体の debugger 警告を抑止します。
   将来的には管理ポリシーによる限定的な導入も検討対象です。
