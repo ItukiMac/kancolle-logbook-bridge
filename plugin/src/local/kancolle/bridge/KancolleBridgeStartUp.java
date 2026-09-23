@@ -32,7 +32,18 @@ public final class KancolleBridgeStartUp implements StartUp {
     private static final AtomicLong JSON_COUNT = new AtomicLong();
     private static final AtomicLong ERRORS = new AtomicLong();
 
+    private static final long HEARTBEAT_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(90);
+    private static final AtomicLong LAST_HEARTBEAT_NANOS = new AtomicLong();
+    private static volatile ChromeState chromeState = ChromeState.WAITING;
+
     private volatile boolean running = true;
+    private ScheduledExecutorService watchdog;
+
+    private enum ChromeState {
+        WAITING,
+        CONNECTED,
+        LOST
+    }
 
     @Override
     public void run() {
@@ -52,6 +63,16 @@ public final class KancolleBridgeStartUp implements StartUp {
             ss.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), PORT), 16);
             log("listening on 127.0.0.1:" + PORT);
 
+            this.watchdog = Executors.newSingleThreadScheduledExecutor(r -> {
+                Thread t = new Thread(r, "kancolle-cdp-bridge-watchdog");
+                t.setDaemon(true);
+                return t;
+            });
+            this.watchdog.scheduleAtFixedRate(
+                KancolleBridgeStartUp::watchdogTick,
+                10L, 10L, TimeUnit.SECONDS
+            );
+
             while (running && !Thread.currentThread().isInterrupted()) {
                 Socket socket = ss.accept();
                 workers.execute(() -> handleSocket(socket));
@@ -59,6 +80,11 @@ public final class KancolleBridgeStartUp implements StartUp {
         } catch (BindException e) {
             ERRORS.incrementAndGet();
             log("ERROR: port " + PORT + " is already in use: " + e);
+            notifyDesktop(
+                "艦これ環境",
+                "Direct Bridge :8891 の待受に失敗しました。航海日誌連携を確認してください。",
+                true
+            );
         } catch (SocketException e) {
             if (running) {
                 ERRORS.incrementAndGet();
@@ -68,6 +94,9 @@ public final class KancolleBridgeStartUp implements StartUp {
             ERRORS.incrementAndGet();
             log("ERROR: server: " + e);
         } finally {
+            if (this.watchdog != null) {
+                this.watchdog.shutdownNow();
+            }
             workers.shutdownNow();
         }
     }
@@ -111,13 +140,36 @@ public final class KancolleBridgeStartUp implements StartUp {
             }
 
             if ("GET".equals(method) && "/health".equals(path)) {
-                String body = "OK received=" + RECEIVED.get()
-                    + " accepted=" + ACCEPTED.get()
-                    + " api=" + API_COUNT.get()
-                    + " image=" + IMAGE_COUNT.get()
-                    + " json=" + JSON_COUNT.get()
-                    + " errors=" + ERRORS.get();
-                sendText(out, 200, "OK", body);
+                sendText(out, 200, "OK", healthBody());
+                return;
+            }
+
+            if ("POST".equals(method) && "/heartbeat".equals(path)) {
+                if (contentLength <= 0 || contentLength > 1024) {
+                    sendText(out, 400, "Bad Request", "invalid heartbeat");
+                    return;
+                }
+
+                byte[] heartbeatBody = in.readNBytes(contentLength);
+                if (heartbeatBody.length != contentLength) {
+                    sendText(out, 400, "Bad Request", "truncated heartbeat");
+                    return;
+                }
+
+                String heartbeat = new String(
+                    heartbeatBody, StandardCharsets.UTF_8
+                ).trim();
+
+                if ("active=true".equals(heartbeat)) {
+                    markHeartbeat(true);
+                } else if ("active=false".equals(heartbeat)) {
+                    markHeartbeat(false);
+                } else {
+                    sendText(out, 400, "Bad Request", "invalid heartbeat");
+                    return;
+                }
+
+                sendText(out, 200, "OK", healthBody());
                 return;
             }
 
@@ -144,11 +196,108 @@ public final class KancolleBridgeStartUp implements StartUp {
             dispatch(packet);
             ACCEPTED.incrementAndGet();
             incrementTypeCounter(packet);
+            refreshHeartbeatFromTraffic();
 
             sendText(out, 200, "OK", "ok");
         } catch (Exception e) {
             ERRORS.incrementAndGet();
             log("ERROR: ingest: " + e);
+        }
+    }
+
+    private static String healthBody() {
+        long heartbeat = LAST_HEARTBEAT_NANOS.get();
+        long ageSeconds = heartbeat == 0L
+            ? -1L
+            : Math.max(
+                0L,
+                TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - heartbeat)
+            );
+
+        return "OK received=" + RECEIVED.get()
+            + " accepted=" + ACCEPTED.get()
+            + " api=" + API_COUNT.get()
+            + " image=" + IMAGE_COUNT.get()
+            + " json=" + JSON_COUNT.get()
+            + " errors=" + ERRORS.get()
+            + " chrome=" + chromeState.name().toLowerCase(Locale.ROOT)
+            + " heartbeatAge=" + ageSeconds;
+    }
+
+    private static synchronized void markHeartbeat(boolean active) {
+        if (!active) {
+            chromeState = ChromeState.WAITING;
+            LAST_HEARTBEAT_NANOS.set(0L);
+            return;
+        }
+
+        ChromeState previous = chromeState;
+        LAST_HEARTBEAT_NANOS.set(System.nanoTime());
+        chromeState = ChromeState.CONNECTED;
+
+        if (previous == ChromeState.LOST) {
+            notifyDesktop(
+                "艦これ環境",
+                "Chrome/CDP Bridge の接続が復旧しました。",
+                false
+            );
+        }
+    }
+
+    private static synchronized void refreshHeartbeatFromTraffic() {
+        if (chromeState == ChromeState.WAITING) {
+            return;
+        }
+
+        ChromeState previous = chromeState;
+        LAST_HEARTBEAT_NANOS.set(System.nanoTime());
+        chromeState = ChromeState.CONNECTED;
+
+        if (previous == ChromeState.LOST) {
+            notifyDesktop(
+                "艦これ環境",
+                "Chrome/CDP Bridge の接続が復旧しました。",
+                false
+            );
+        }
+    }
+
+    private static synchronized void watchdogTick() {
+        if (chromeState != ChromeState.CONNECTED) {
+            return;
+        }
+
+        long heartbeat = LAST_HEARTBEAT_NANOS.get();
+        if (heartbeat == 0L) {
+            return;
+        }
+
+        long age = System.nanoTime() - heartbeat;
+        if (age < HEARTBEAT_TIMEOUT_NANOS) {
+            return;
+        }
+
+        chromeState = ChromeState.LOST;
+        notifyDesktop(
+            "艦これ環境",
+            "Chrome/CDP Bridge から90秒以上 heartbeat がありません。艦これの通信取得を確認してください。",
+            true
+        );
+    }
+
+    private static void notifyDesktop(String title, String message, boolean warning) {
+        try {
+            new ProcessBuilder(
+                "notify-send",
+                "--app-name=航海日誌改",
+                "--urgency=" + (warning ? "critical" : "normal"),
+                "--expire-time=10000",
+                "--icon=" + (warning ? "dialog-warning" : "dialog-information"),
+                title,
+                message
+            ).start();
+        } catch (IOException e) {
+            log("notify-send unavailable: " + e.getMessage());
         }
     }
 
