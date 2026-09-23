@@ -1,8 +1,16 @@
 const DMM_PREFIX = "https://play.games.dmm.com/game/kancolle";
 const KANCOLLE_HOST_SUFFIX = ".kancolle-server.com";
-const API_PREFIX = "/kcsapi/";
 const PLUGIN_BASE = "http://127.0.0.1:8891";
 const MAX_CAPTURES = 40;
+
+const KCS2_PREFIXES = [
+  "/kcs2/resources/ship/",
+  "/kcs2/resources/map/",
+  "/kcs2/resources/gauge/",
+  "/kcs2/img/common/",
+  "/kcs2/img/duty/",
+  "/kcs2/img/sally/"
+];
 
 const tabState = new Map();
 const disabledTabs = new Set();
@@ -24,19 +32,25 @@ function isGamePage(url) {
   return typeof url === "string" && url.startsWith(DMM_PREFIX);
 }
 
-function parseApiUrl(url) {
+function parseCaptureUrl(url) {
   try {
     const u = new URL(url);
     const hostOk =
       u.hostname === "kancolle-server.com" ||
       u.hostname.endsWith(KANCOLLE_HOST_SUFFIX);
+    if (!hostOk) return null;
 
-    if (!hostOk || !u.pathname.startsWith(API_PREFIX)) return null;
+    if (u.pathname.startsWith("/kcsapi/")) {
+      return { path: u.pathname, queryString: u.search || "", family: "api" };
+    }
 
-    return {
-      path: u.pathname,
-      queryString: u.search || ""
-    };
+    for (const prefix of KCS2_PREFIXES) {
+      if (u.pathname.startsWith(prefix)) {
+        return { path: u.pathname, queryString: u.search || "", family: "kcs2" };
+      }
+    }
+
+    return null;
   } catch (_) {
     return null;
   }
@@ -58,7 +72,7 @@ function stateFor(tabId) {
 }
 
 function sourceKey(source, requestId) {
-  return `${source.sessionId || "root"}:${requestId}`;
+  return \`\${source.sessionId || "root"}:\${requestId}\`;
 }
 
 function sourceToDebuggee(source) {
@@ -116,7 +130,7 @@ async function pluginHealth() {
     const r = await fetch(PLUGIN_BASE + "/health", { cache: "no-store" });
     const text = await r.text();
     if (!r.ok || !text.startsWith("OK ")) {
-      throw new Error(`HTTP ${r.status}: ${text}`);
+      throw new Error(\`HTTP \${r.status}: \${text}\`);
     }
     pluginState.status = "connected";
     pluginState.lastHealth = text;
@@ -133,21 +147,17 @@ async function pluginHealth() {
   }
 }
 
-function putString(view, bytes, offset, text) {
-  const b = new TextEncoder().encode(text || "");
-  view.setUint32(offset, b.length, false);
-  bytes.set(b, offset + 4);
-  return offset + 4 + b.length;
-}
-
-function encodePacket(info, postData, responseBody) {
+function encodePacket(info, postData, result) {
   const enc = new TextEncoder();
   const fields = [
     info.method || "",
     info.path || "",
     info.queryString || "",
     postData || "",
-    responseBody || ""
+    result?.base64Encoded ? "base64" : "",
+    info.mimeType || "",
+    String(info.status ?? 200),
+    result?.body || ""
   ].map(s => enc.encode(s));
 
   let total = 4 + 4 + 8;
@@ -158,7 +168,7 @@ function encodePacket(info, postData, responseBody) {
   const view = new DataView(buffer);
 
   view.setUint32(0, 0x4B435031, false); // KCP1
-  view.setUint32(4, 1, false);
+  view.setUint32(4, 2, false);          // protocol v2: encoding/mime/status support
   view.setBigUint64(8, BigInt(Date.now()), false);
 
   let off = 16;
@@ -172,9 +182,9 @@ function encodePacket(info, postData, responseBody) {
   return buffer;
 }
 
-async function sendDirect(info, postData, responseBody) {
+async function sendDirect(info, postData, result) {
   try {
-    const body = encodePacket(info, postData, responseBody);
+    const body = encodePacket(info, postData, result);
     const r = await fetch(PLUGIN_BASE + "/ingest", {
       method: "POST",
       headers: { "Content-Type": "application/octet-stream" },
@@ -183,7 +193,7 @@ async function sendDirect(info, postData, responseBody) {
     const text = await r.text();
 
     if (!r.ok || text.trim() !== "ok") {
-      throw new Error(`HTTP ${r.status}: ${text}`);
+      throw new Error(\`HTTP \${r.status}: \${text}\`);
     }
 
     pluginState.status = "connected";
@@ -296,7 +306,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   s.attached = false;
   s.requests.clear();
   s.sessions.clear();
-  s.lastError = `detached: ${reason}`;
+  s.lastError = \`detached: \${reason}\`;
   s.updatedAt = nowIso();
   setBadge(source.tabId, "").catch(() => {});
   saveState().catch(() => {});
@@ -322,23 +332,28 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 
     if (method === "Network.requestWillBeSent") {
       const req = params.request || {};
-      const api = parseApiUrl(req.url || "");
-      if (!api) return;
+      const capture = parseCaptureUrl(req.url || "");
+      if (!capture) return;
 
       s.requests.set(sourceKey(source, params.requestId), {
         requestId: params.requestId,
         method: req.method || "",
-        path: api.path,
-        queryString: api.queryString,
+        path: capture.path,
+        queryString: capture.queryString,
+        family: capture.family,
         postData: typeof req.postData === "string" ? req.postData : "",
-        status: null
+        status: null,
+        mimeType: ""
       });
       return;
     }
 
     if (method === "Network.responseReceived") {
       const info = s.requests.get(sourceKey(source, params.requestId));
-      if (info) info.status = params.response?.status ?? null;
+      if (info) {
+        info.status = params.response?.status ?? null;
+        info.mimeType = params.response?.mimeType || "";
+      }
       return;
     }
 
@@ -374,28 +389,41 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
           { requestId: params.requestId }
         );
 
-        if (result?.base64Encoded) {
-          throw new Error("unexpected base64 API response");
+        // Match the original MessageFlow behavior:
+        // /kcsapi/ => text API body
+        // /kcs2/ => base64 resources (images) or *.json text only
+        let resourceType = "api";
+        if (info.family === "kcs2") {
+          if (result?.base64Encoded) {
+            resourceType = "image";
+          } else if (info.path.endsWith(".json")) {
+            resourceType = "json";
+          } else {
+            return;
+          }
         }
 
         const responseBody = result?.body || "";
-        const direct = await sendDirect(info, postData, responseBody);
+        const direct = await sendDirect(info, postData, result);
 
         await appendCapture(source.tabId, {
           at: nowIso(),
           method: info.method,
           path: info.path,
+          type: resourceType,
+          encoding: result?.base64Encoded ? "base64" : "text",
           httpStatus: info.status,
           postDataBytes: postData.length,
           responseBytes: responseBody.length,
-          looksLikeSvdata: responseBody.startsWith("svdata="),
+          looksLikeSvdata:
+            !result?.base64Encoded && responseBody.startsWith("svdata="),
           session: source.sessionId ? "iframe" : "root",
           direct
         });
       } catch (e) {
         await recordTabError(
           source.tabId,
-          `direct ${info.path}: ${e.message || e}`
+          \`direct \${info.path}: \${e.message || e}\`
         );
       }
     }
