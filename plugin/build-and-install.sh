@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -eu
 
+VERSION="${VERSION:-0.4.0}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
 APP_JAR="$LOGBOOK/logbook-kai.jar"
 PLUGINS="$LOGBOOK/plugins"
-OUT="$PLUGINS/kancolle-cdp-bridge-poc-v03.jar"
+OUT="$PLUGINS/kancolle-cdp-bridge-plugin-v$VERSION.jar"
 
 if [ ! -f "$APP_JAR" ]; then
   echo "NG: $APP_JAR が見つかりません"
@@ -42,18 +43,29 @@ printf '%s\n' \
   'local.kancolle.bridge.KancolleBridgeStartUp' \
   > "$BUILD/classes/META-INF/services/logbook.plugin.lifecycle.StartUp"
 
+cat > "$BUILD/MANIFEST.MF" <<EOF
+Manifest-Version: 1.0
+Implementation-Title: Kancolle CDP Bridge
+Implementation-Vendor: ItukiMac
+Implementation-Version: $VERSION
+Bundle-License: MIT
+EOF
+
 mkdir -p "$PLUGINS"
 
 (
   cd "$BUILD/classes"
-  "$JAR" --create --file "$BUILD/kancolle-cdp-bridge-poc-v03.jar" .
+  "$JAR" --create \
+    --file "$BUILD/kancolle-cdp-bridge-plugin-v$VERSION.jar" \
+    --manifest "$BUILD/MANIFEST.MF" \
+    .
 )
 
-cp -a "$BUILD/kancolle-cdp-bridge-poc-v03.jar" "$OUT"
+cp -a "$BUILD/kancolle-cdp-bridge-plugin-v$VERSION.jar" "$OUT"
 
 echo
 echo "OK: プラグインを新規配置しました"
 echo "$OUT"
 echo
-echo "次: 航海日誌改を一度終了し、通常どおり起動し直してください。"
-echo "既存MessageFlowは削除せず、そのままで構いません。"
+echo "旧バージョンのDirect Bridgeプラグインが残っている場合は同時に有効化しないでください。"
+echo "航海日誌改を再起動してください。"

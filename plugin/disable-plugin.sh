@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 set -eu
+VERSION="${VERSION:-0.4.0}"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
-SRC="$LOGBOOK/plugins/kancolle-cdp-bridge-poc-v03.jar"
-DST="$LOGBOOK/plugins/kancolle-cdp-bridge-poc-v03.jar.disabled"
+SRC="$LOGBOOK/plugins/kancolle-cdp-bridge-plugin-v$VERSION.jar"
+DST="$SRC.disabled"
 
 if [ ! -f "$SRC" ]; then
-  echo "有効なPoCプラグインは見つかりません: $SRC"
+  echo "有効なPluginは見つかりません: $SRC"
   exit 0
 fi
 
@@ -15,6 +16,6 @@ if [ -e "$DST" ]; then
 fi
 
 mv "$SRC" "$DST"
-echo "PoCプラグインを削除せず無効化しました:"
+echo "Pluginを削除せず無効化しました:"
 echo "$DST"
 echo "航海日誌改を再起動してください。"
