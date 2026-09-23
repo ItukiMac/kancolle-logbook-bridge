@@ -17,7 +17,7 @@
   - Kancolle CDP Bridge / ItukiMac / version / MIT
 - The unpacked Chrome extension remains registered after reboot from its fixed path.
 
-## Implemented in v0.5.x
+## Implemented in v0.5.x / v0.6.0
 
 Connection-loss monitoring and notification:
 
@@ -34,6 +34,16 @@ Connection-loss monitoring and notification:
 - Plugin reports `chrome=<state>` and `heartbeatAge=<seconds>` in `/health`.
 - Plugin uses `System.nanoTime()` for heartbeat age so normal system suspend does not count toward the timeout.
 - Bind failure on TCP/8891 triggers a desktop notification.
+
+## v0.6.0 changes
+
+- Connection-loss detection target reduced from about 90 seconds to about 30 seconds.
+- Chrome side alerts on the first failed 30-second heartbeat check.
+- Plugin watchdog timeout reduced to 30 seconds and checks every 5 seconds.
+- Plugin adds a compact Direct Bridge status strip to the logbook-kai main window.
+- Status strip shows state, heartbeat age, API/image/JSON counters, and error count.
+- `/health` now includes `timeout=30`.
+- Chrome popup and `/health` remain available as non-notification fallback status views.
 
 ## Existing MessageFlow-compatible resource forwarding
 
