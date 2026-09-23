@@ -50,6 +50,13 @@ jobs:
           test -n "$LOGBOOK_JAR"
           echo "LOGBOOK_JAR=$LOGBOOK_JAR" >> "$GITHUB_ENV"
 
+      - name: Validate extension JavaScript
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check extension/background.js
+          node --check extension/popup.js
+
       - name: Build release assets
         shell: bash
         env:
