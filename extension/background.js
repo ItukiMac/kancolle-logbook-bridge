@@ -4,7 +4,7 @@ const PLUGIN_BASE = "http://127.0.0.1:8891";
 const MAX_CAPTURES = 40;
 const HEARTBEAT_ALARM = "bridge-heartbeat";
 const HEARTBEAT_PERIOD_MINUTES = 0.5;
-const FAILURE_THRESHOLD = 3;
+const FAILURE_THRESHOLD = 1;
 const NOTIFICATION_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAABgUlEQVR4nO3dMQrCQBBAUSMeS0HRYwsWHkwPkCqF2cX/Xp1iis80YZLlfL1/DmQdRw/AWAKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHGn0QPs6f16bnr+cnv8aJJ52ABxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgbpnl17Fbjzb+wQyHJzZAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQN827gD34SNSaDRAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAXOougDUbIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHEfQFMRRD3fdwPowAAAABJRU5ErkJggg==";
 
 const KCS2_PREFIXES = [
@@ -210,7 +210,7 @@ async function markPluginFailure(error, immediate = false) {
       "艦これ Direct Bridge 接続エラー",
       immediate
         ? "航海日誌改へのデータ送信に失敗しました。ログ取得状態を確認してください。"
-        : "航海日誌改プラグインへ約90秒接続できません。ログ取得状態を確認してください。"
+        : "航海日誌改プラグインへ約30秒接続できません。ログ取得状態を確認してください。"
     );
   }
 
