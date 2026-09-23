@@ -126,8 +126,13 @@ async function recordTabError(tabId, e) {
 }
 
 async function pluginHealth() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2500);
   try {
-    const r = await fetch(PLUGIN_BASE + "/health", { cache: "no-store" });
+    const r = await fetch(PLUGIN_BASE + "/health", {
+      cache: "no-store",
+      signal: controller.signal
+    });
     const text = await r.text();
     if (!r.ok || !text.startsWith("OK ")) {
       throw new Error(`HTTP ${r.status}: ${text}`);
@@ -144,6 +149,8 @@ async function pluginHealth() {
     pluginState.lastError = String(e?.message || e);
     await saveState();
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -435,7 +442,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message?.type === "status") {
-      await pluginHealth().catch(() => {});
+      pluginHealth().catch(() => {});
       const [active] = await chrome.tabs.query({
         active: true,
         currentWindow: true
