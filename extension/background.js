@@ -72,7 +72,7 @@ function stateFor(tabId) {
 }
 
 function sourceKey(source, requestId) {
-  return \`\${source.sessionId || "root"}:\${requestId}\`;
+  return `${source.sessionId || "root"}:${requestId}`;
 }
 
 function sourceToDebuggee(source) {
@@ -130,7 +130,7 @@ async function pluginHealth() {
     const r = await fetch(PLUGIN_BASE + "/health", { cache: "no-store" });
     const text = await r.text();
     if (!r.ok || !text.startsWith("OK ")) {
-      throw new Error(\`HTTP \${r.status}: \${text}\`);
+      throw new Error(`HTTP ${r.status}: ${text}`);
     }
     pluginState.status = "connected";
     pluginState.lastHealth = text;
@@ -193,7 +193,7 @@ async function sendDirect(info, postData, result) {
     const text = await r.text();
 
     if (!r.ok || text.trim() !== "ok") {
-      throw new Error(\`HTTP \${r.status}: \${text}\`);
+      throw new Error(`HTTP ${r.status}: ${text}`);
     }
 
     pluginState.status = "connected";
@@ -306,7 +306,7 @@ chrome.debugger.onDetach.addListener((source, reason) => {
   s.attached = false;
   s.requests.clear();
   s.sessions.clear();
-  s.lastError = \`detached: \${reason}\`;
+  s.lastError = `detached: ${reason}`;
   s.updatedAt = nowIso();
   setBadge(source.tabId, "").catch(() => {});
   saveState().catch(() => {});
@@ -423,7 +423,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
       } catch (e) {
         await recordTabError(
           source.tabId,
-          \`direct \${info.path}: \${e.message || e}\`
+          `direct ${info.path}: ${e.message || e}`
         );
       }
     }
