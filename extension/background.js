@@ -283,10 +283,21 @@ async function sendHeartbeat(active) {
 }
 
 async function heartbeatTick() {
-  const tabs = await chrome.tabs.query({});
-  const active = tabs.some(
-    tab => tab.id && isGamePage(tab.url || "") && !disabledTabs.has(tab.id)
+  // Prefer actual CDP attachment state. The top-level tab URL can transition
+  // while the Kancolle iframe/OOPIF remains the monitored source.
+  let active = [...tabState.entries()].some(
+    ([tabId, state]) => state.attached && !disabledTabs.has(tabId)
   );
+
+  // On MV3 service-worker restart tabState is empty until scanTabs finishes,
+  // so fall back to currently visible Kancolle tabs.
+  if (!active) {
+    const tabs = await chrome.tabs.query({});
+    active = tabs.some(
+      tab => tab.id && isGamePage(tab.url || "") && !disabledTabs.has(tab.id)
+    );
+  }
+
   await sendHeartbeat(active);
 }
 
@@ -350,6 +361,7 @@ async function sendDirect(info, postData, result) {
     }
 
     pluginState.sent += 1;
+    pluginState.monitoring = true;
     await markPluginSuccess();
     return true;
   } catch (e) {
@@ -389,7 +401,9 @@ async function attachTab(tabId) {
 
     await enableNetwork({ tabId });
     await enableAutoAttach({ tabId });
-    pluginHealth().catch(() => {});
+    // A successful CDP attach means this tab is actively monitored.
+    // Arm the plugin watchdog immediately instead of waiting for the alarm.
+    await sendHeartbeat(true);
     await saveState();
   } catch (e) {
     await recordTabError(tabId, e);
