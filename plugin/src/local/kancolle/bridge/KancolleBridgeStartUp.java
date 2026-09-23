@@ -245,10 +245,8 @@ public final class KancolleBridgeStartUp implements StartUp {
     }
 
     private static synchronized void refreshHeartbeatFromTraffic() {
-        if (chromeState == ChromeState.WAITING) {
-            return;
-        }
-
+        // Successful ingest itself proves that Chrome/CDP is alive.
+        // This also arms monitoring if a separate heartbeat has not arrived yet.
         ChromeState previous = chromeState;
         LAST_HEARTBEAT_NANOS.set(System.nanoTime());
         chromeState = ChromeState.CONNECTED;
