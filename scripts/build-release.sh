@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${VERSION:-0.3.0}"
+VERSION="${VERSION:-0.4.0}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGBOOK_JAR="${LOGBOOK_JAR:-$HOME/logbook-kai/logbook-kai.jar}"
 WORK="$ROOT/.release-build"
@@ -38,11 +38,20 @@ NOTES="$ROOT/release/v$VERSION/RELEASE_NOTES.md"
 
 javac -encoding UTF-8 -cp "$LOGBOOK_JAR" -d "$WORK/classes" "$PLUGIN_SRC"
 
-printf '%s\n' 'local.kancolle.bridge.KancolleBridgeStartUp'   > "$WORK/classes/META-INF/services/logbook.plugin.lifecycle.StartUp"
+printf '%s\n' 'local.kancolle.bridge.KancolleBridgeStartUp' \
+  > "$WORK/classes/META-INF/services/logbook.plugin.lifecycle.StartUp"
+
+cat > "$WORK/MANIFEST.MF" <<EOF
+Manifest-Version: 1.0
+Implementation-Title: Kancolle CDP Bridge
+Implementation-Vendor: ItukiMac
+Implementation-Version: $VERSION
+Bundle-License: MIT
+EOF
 
 (
   cd "$WORK/classes"
-  jar --create --file "$PLUGIN_JAR" .
+  jar --create --file "$PLUGIN_JAR" --manifest "$WORK/MANIFEST.MF" .
 )
 
 (
@@ -74,6 +83,7 @@ fi
 
 cp -a "\$SRC" "\$DST"
 echo "OK: \$DST"
+echo "旧バージョンのDirect Bridgeプラグインが残っている場合は同時に有効化しないでください。"
 echo "航海日誌改を再起動してください。"
 EOF
 
@@ -106,7 +116,11 @@ chmod +x "$STAGE/plugin/install.sh" "$STAGE/plugin/disable.sh"
 
 (
   cd "$DIST"
-  sha256sum     "$(basename "$FULL_ZIP")"     "$(basename "$EXT_ZIP")"     "$(basename "$PLUGIN_JAR")"     > "SHA256SUMS-v$VERSION.txt"
+  sha256sum \
+    "$(basename "$FULL_ZIP")" \
+    "$(basename "$EXT_ZIP")" \
+    "$(basename "$PLUGIN_JAR")" \
+    > "SHA256SUMS-v$VERSION.txt"
 )
 
 echo "Release files:"
