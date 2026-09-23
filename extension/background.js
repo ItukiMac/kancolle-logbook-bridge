@@ -30,6 +30,23 @@ let pluginState = {
   updatedAt: null
 };
 
+let stateLoadPromise = null;
+
+async function ensurePluginStateLoaded() {
+  if (!stateLoadPromise) {
+    stateLoadPromise = (async () => {
+      const stored = await chrome.storage.local.get("pluginState");
+      if (stored?.pluginState && typeof stored.pluginState === "object") {
+        pluginState = {
+          ...pluginState,
+          ...stored.pluginState
+        };
+      }
+    })().catch(() => {});
+  }
+  await stateLoadPromise;
+}
+
 function nowIso() {
   return new Date().toISOString();
 }
@@ -156,6 +173,7 @@ function updateAcceptedFromHealth(text) {
 }
 
 async function markPluginSuccess(healthText = null) {
+  await ensurePluginStateLoaded();
   const hadAlert = Boolean(pluginState.alerted);
   pluginState.status = "connected";
   pluginState.lastError = null;
@@ -175,6 +193,7 @@ async function markPluginSuccess(healthText = null) {
 }
 
 async function markPluginFailure(error, immediate = false) {
+  await ensurePluginStateLoaded();
   pluginState.status = "disconnected";
   pluginState.lastError = String(error?.message || error);
   pluginState.consecutiveFailures =
@@ -198,6 +217,7 @@ async function markPluginFailure(error, immediate = false) {
 }
 
 async function clearMonitoringAlert() {
+  await ensurePluginStateLoaded();
   pluginState.monitoring = false;
   pluginState.consecutiveFailures = 0;
   pluginState.alerted = false;
@@ -216,6 +236,7 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
 }
 
 async function pluginHealth(trackFailure = false) {
+  await ensurePluginStateLoaded();
   try {
     const r = await fetchWithTimeout(
       PLUGIN_BASE + "/health",
@@ -240,6 +261,7 @@ async function pluginHealth(trackFailure = false) {
 }
 
 async function sendHeartbeat(active) {
+  await ensurePluginStateLoaded();
   pluginState.monitoring = active;
 
   if (!active && pluginState.alerted) {
@@ -283,6 +305,8 @@ async function sendHeartbeat(active) {
 }
 
 async function heartbeatTick() {
+  await ensurePluginStateLoaded();
+
   // Prefer actual CDP attachment state. The top-level tab URL can transition
   // while the Kancolle iframe/OOPIF remains the monitored source.
   let active = [...tabState.entries()].some(
@@ -343,6 +367,7 @@ function encodePacket(info, postData, result) {
 }
 
 async function sendDirect(info, postData, result) {
+  await ensurePluginStateLoaded();
   try {
     const body = encodePacket(info, postData, result);
     const r = await fetchWithTimeout(
@@ -609,6 +634,7 @@ chrome.debugger.onEvent.addListener(async (source, method, params) => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     if (message?.type === "status") {
+      await ensurePluginStateLoaded();
       pluginHealth().catch(() => {});
       const [active] = await chrome.tabs.query({
         active: true,
