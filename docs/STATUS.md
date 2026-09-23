@@ -23,6 +23,7 @@ Connection-loss monitoring and notification:
 
 - Chrome extension sends a heartbeat every 30 seconds while a monitored Kancolle tab is active.
 - v0.5.1 fixes watchdog arming: actual CDP attachment and successful ingest traffic both establish `connected` state.
+- v0.5.2 persists Chrome-side failure/alert state in `chrome.storage.local` so MV3 service-worker suspension does not reset the 3-failure notification threshold.
 - Chrome notifies immediately when `/ingest` fails.
 - Chrome notifies after 3 consecutive heartbeat failures (about 90 seconds).
 - Chrome sends a one-shot recovery notification after connectivity returns.
