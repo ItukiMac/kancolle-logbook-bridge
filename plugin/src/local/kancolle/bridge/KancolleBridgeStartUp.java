@@ -289,7 +289,7 @@ public final class KancolleBridgeStartUp implements StartUp {
                 "notify-send",
                 "--app-name=航海日誌改",
                 "--urgency=" + (warning ? "critical" : "normal"),
-                "--expire-time=10000",
+                "--expire-time=" + (warning ? "0" : "10000"),
                 "--icon=" + (warning ? "dialog-warning" : "dialog-information"),
                 title,
                 message
