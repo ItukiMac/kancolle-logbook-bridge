@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${VERSION:-0.4.0}"
+VERSION="${VERSION:-0.5.0}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGBOOK_JAR="${LOGBOOK_JAR:-$HOME/logbook-kai/logbook-kai.jar}"
 WORK="$ROOT/.release-build"
