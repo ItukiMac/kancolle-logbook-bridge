@@ -94,6 +94,7 @@ extension/          Chrome Manifest V3 拡張
 plugin/             logbook-kai 用 Direct Bridge plugin
 docs/STATUS.md      現時点の検証状況
 docs/DESIGN.md      構成と責務
+docs/OPERATIONS.md  Mint自動起動・バックアップ・OBS録画先確認
 ```
 
 ## ビルド / 導入
@@ -118,11 +119,11 @@ Chrome側は `extension/` を `chrome://extensions` の
 
 ## 接続監視
 
-v0.5.0では、艦これタブを監視している間だけChrome拡張が30秒周期で
+Chrome拡張は、艦これタブを監視している間だけ30秒周期で
 `127.0.0.1:8891/heartbeat`へheartbeatを送ります。
 
-- Chrome側: `/ingest`失敗は即時通知、heartbeatは3回連続失敗で通知
-- Plugin側: heartbeatが90秒以上途絶えた場合に `notify-send` で通知
+- Chrome側: `/ingest`失敗は即時通知、heartbeat確認失敗は最初の30秒チェックで通知
+- Plugin側: heartbeatまたは正常なingestが30秒途絶えた場合に `notify-send` で通知
 - 復旧時は双方で1回だけ復旧通知
 - 艦これタブを閉じる/監視停止する場合は `active=false` で監視解除
 - `/health` には `chrome=waiting|connected|lost` と `heartbeatAge` を表示
