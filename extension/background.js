@@ -2,6 +2,9 @@ const DMM_PREFIX = "https://play.games.dmm.com/game/kancolle";
 const KANCOLLE_HOST_SUFFIX = ".kancolle-server.com";
 const PLUGIN_BASE = "http://127.0.0.1:8891";
 const MAX_CAPTURES = 40;
+const HEARTBEAT_ALARM = "bridge-heartbeat";
+const HEARTBEAT_PERIOD_MINUTES = 0.5;
+const FAILURE_THRESHOLD = 3;
 
 const KCS2_PREFIXES = [
   "/kcs2/resources/ship/",
@@ -21,6 +24,9 @@ let pluginState = {
   accepted: 0,
   lastError: null,
   lastHealth: null,
+  monitoring: false,
+  consecutiveFailures: 0,
+  alerted: false,
   updatedAt: null
 };
 
@@ -125,33 +131,169 @@ async function recordTabError(tabId, e) {
   await saveState();
 }
 
-async function pluginHealth() {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2500);
+async function notifyBridge(id, title, message) {
   try {
-    const r = await fetch(PLUGIN_BASE + "/health", {
-      cache: "no-store",
-      signal: controller.signal
+    if (id === "bridge-down") {
+      await chrome.notifications.clear("bridge-up");
+    } else if (id === "bridge-up") {
+      await chrome.notifications.clear("bridge-down");
+    }
+    await chrome.notifications.create(id, {
+      type: "basic",
+      iconUrl: chrome.runtime.getURL("icon.svg"),
+      title,
+      message,
+      priority: 2
     });
+  } catch (_) {}
+}
+
+function updateAcceptedFromHealth(text) {
+  if (!text) return;
+  pluginState.lastHealth = text;
+  const m = text.match(/\baccepted=(\d+)/);
+  if (m) pluginState.accepted = Number(m[1]);
+}
+
+async function markPluginSuccess(healthText = null) {
+  const hadAlert = Boolean(pluginState.alerted);
+  pluginState.status = "connected";
+  pluginState.lastError = null;
+  pluginState.consecutiveFailures = 0;
+  updateAcceptedFromHealth(healthText);
+
+  if (hadAlert) {
+    pluginState.alerted = false;
+    await notifyBridge(
+      "bridge-up",
+      "艦これ Direct Bridge",
+      "航海日誌改との接続が復旧しました。"
+    );
+  }
+
+  await saveState();
+}
+
+async function markPluginFailure(error, immediate = false) {
+  pluginState.status = "disconnected";
+  pluginState.lastError = String(error?.message || error);
+  pluginState.consecutiveFailures =
+    Number(pluginState.consecutiveFailures || 0) + 1;
+
+  const shouldAlert =
+    immediate || pluginState.consecutiveFailures >= FAILURE_THRESHOLD;
+
+  if (shouldAlert && !pluginState.alerted) {
+    pluginState.alerted = true;
+    await notifyBridge(
+      "bridge-down",
+      "艦これ Direct Bridge 接続エラー",
+      immediate
+        ? "航海日誌改へのデータ送信に失敗しました。ログ取得状態を確認してください。"
+        : "航海日誌改プラグインへ約90秒接続できません。ログ取得状態を確認してください。"
+    );
+  }
+
+  await saveState();
+}
+
+async function clearMonitoringAlert() {
+  pluginState.monitoring = false;
+  pluginState.consecutiveFailures = 0;
+  pluginState.alerted = false;
+  await chrome.notifications.clear("bridge-down").catch(() => {});
+  await saveState();
+}
+
+async function fetchWithTimeout(url, options = {}, timeoutMs = 2500) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function pluginHealth(trackFailure = false) {
+  try {
+    const r = await fetchWithTimeout(
+      PLUGIN_BASE + "/health",
+      { cache: "no-store" }
+    );
     const text = await r.text();
     if (!r.ok || !text.startsWith("OK ")) {
       throw new Error(`HTTP ${r.status}: ${text}`);
     }
-    pluginState.status = "connected";
-    pluginState.lastHealth = text;
-    pluginState.lastError = null;
-    const m = text.match(/\baccepted=(\d+)/);
-    if (m) pluginState.accepted = Number(m[1]);
-    await saveState();
+    await markPluginSuccess(text);
     return true;
   } catch (e) {
-    pluginState.status = "disconnected";
-    pluginState.lastError = String(e?.message || e);
-    await saveState();
+    if (trackFailure && pluginState.monitoring) {
+      await markPluginFailure(e, false);
+    } else {
+      pluginState.status = "disconnected";
+      pluginState.lastError = String(e?.message || e);
+      await saveState();
+    }
     return false;
-  } finally {
-    clearTimeout(timer);
   }
+}
+
+async function sendHeartbeat(active) {
+  pluginState.monitoring = active;
+
+  if (!active && pluginState.alerted) {
+    await clearMonitoringAlert();
+  }
+
+  try {
+    const r = await fetchWithTimeout(
+      PLUGIN_BASE + "/heartbeat",
+      {
+        method: "POST",
+        headers: { "Content-Type": "text/plain; charset=UTF-8" },
+        body: active ? "active=true" : "active=false",
+        cache: "no-store"
+      }
+    );
+    const text = await r.text();
+    if (!r.ok || !text.startsWith("OK ")) {
+      throw new Error(`HTTP ${r.status}: ${text}`);
+    }
+
+    if (active) {
+      await markPluginSuccess(text);
+    } else {
+      pluginState.status = "connected";
+      pluginState.lastError = null;
+      updateAcceptedFromHealth(text);
+      await saveState();
+    }
+    return true;
+  } catch (e) {
+    if (active) {
+      await markPluginFailure(e, false);
+    } else {
+      pluginState.status = "disconnected";
+      pluginState.lastError = String(e?.message || e);
+      await saveState();
+    }
+    return false;
+  }
+}
+
+async function heartbeatTick() {
+  const tabs = await chrome.tabs.query({});
+  const active = tabs.some(
+    tab => tab.id && isGamePage(tab.url || "") && !disabledTabs.has(tab.id)
+  );
+  await sendHeartbeat(active);
+}
+
+async function ensureHeartbeatAlarm() {
+  await chrome.alarms.create(HEARTBEAT_ALARM, {
+    periodInMinutes: HEARTBEAT_PERIOD_MINUTES
+  });
 }
 
 function encodePacket(info, postData, result) {
@@ -203,15 +345,11 @@ async function sendDirect(info, postData, result) {
       throw new Error(`HTTP ${r.status}: ${text}`);
     }
 
-    pluginState.status = "connected";
     pluginState.sent += 1;
-    pluginState.lastError = null;
-    pluginHealth().catch(() => {});
+    await markPluginSuccess();
     return true;
   } catch (e) {
-    pluginState.status = "error";
-    pluginState.lastError = String(e?.message || e);
-    await saveState();
+    await markPluginFailure(e, true);
     return false;
   }
 }
@@ -280,13 +418,21 @@ async function scanTabs() {
 }
 
 chrome.runtime.onInstalled.addListener(() => {
+  ensureHeartbeatAlarm().catch(() => {});
   scanTabs().catch(() => {});
-  pluginHealth().catch(() => {});
+  heartbeatTick().catch(() => {});
 });
 
 chrome.runtime.onStartup.addListener(() => {
+  ensureHeartbeatAlarm().catch(() => {});
   scanTabs().catch(() => {});
-  pluginHealth().catch(() => {});
+  heartbeatTick().catch(() => {});
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === HEARTBEAT_ALARM) {
+    heartbeatTick().catch(() => {});
+  }
 });
 
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
@@ -294,9 +440,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     if (isGamePage(tab.url || "")) {
       if (changeInfo.url) disabledTabs.delete(tabId);
       attachTab(tabId).catch(() => {});
+      heartbeatTick().catch(() => {});
     } else {
       const s = tabState.get(tabId);
       if (s?.attached) detachTab(tabId, false).catch(() => {});
+      heartbeatTick().catch(() => {});
     }
   }
 });
@@ -305,6 +453,7 @@ chrome.tabs.onRemoved.addListener((tabId) => {
   tabState.delete(tabId);
   disabledTabs.delete(tabId);
   saveState().catch(() => {});
+  heartbeatTick().catch(() => {});
 });
 
 chrome.debugger.onDetach.addListener((source, reason) => {
@@ -474,6 +623,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       }
       disabledTabs.delete(active.id);
       await attachTab(active.id);
+      await heartbeatTick();
       sendResponse({ ok: true });
       return;
     }
@@ -484,6 +634,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         currentWindow: true
       });
       if (active?.id) await detachTab(active.id, true);
+      await heartbeatTick();
       sendResponse({ ok: true });
       return;
     }
@@ -508,5 +659,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return true;
 });
 
+ensureHeartbeatAlarm().catch(() => {});
 scanTabs().catch(() => {});
-pluginHealth().catch(() => {});
+heartbeatTick().catch(() => {});
