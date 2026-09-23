@@ -7,6 +7,15 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import javafx.application.Platform;
+import javafx.scene.Node;
+import javafx.scene.Parent;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.VBox;
+import javafx.stage.Window;
+
 import logbook.core.LogBookCoreServices;
 import logbook.listener.ContentListenerSpi;
 import logbook.net.RequestMetaData;
@@ -32,9 +41,12 @@ public final class KancolleBridgeStartUp implements StartUp {
     private static final AtomicLong JSON_COUNT = new AtomicLong();
     private static final AtomicLong ERRORS = new AtomicLong();
 
-    private static final long HEARTBEAT_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(90);
+    private static final long HEARTBEAT_TIMEOUT_NANOS = TimeUnit.SECONDS.toNanos(30);
+    private static final String STATUS_BAR_ID = "kancolle-cdp-bridge-status";
+    private static final String STATUS_LABEL_ID = "kancolle-cdp-bridge-status-label";
     private static final AtomicLong LAST_HEARTBEAT_NANOS = new AtomicLong();
     private static volatile ChromeState chromeState = ChromeState.WAITING;
+    private static volatile Label statusLabel;
 
     private volatile boolean running = true;
     private ScheduledExecutorService watchdog;
@@ -70,8 +82,9 @@ public final class KancolleBridgeStartUp implements StartUp {
             });
             this.watchdog.scheduleAtFixedRate(
                 KancolleBridgeStartUp::watchdogTick,
-                10L, 10L, TimeUnit.SECONDS
+                5L, 5L, TimeUnit.SECONDS
             );
+            updateMainWindowStatus();
 
             while (running && !Thread.currentThread().isInterrupted()) {
                 Socket socket = ss.accept();
@@ -221,13 +234,15 @@ public final class KancolleBridgeStartUp implements StartUp {
             + " json=" + JSON_COUNT.get()
             + " errors=" + ERRORS.get()
             + " chrome=" + chromeState.name().toLowerCase(Locale.ROOT)
-            + " heartbeatAge=" + ageSeconds;
+            + " heartbeatAge=" + ageSeconds
+            + " timeout=30";
     }
 
     private static synchronized void markHeartbeat(boolean active) {
         if (!active) {
             chromeState = ChromeState.WAITING;
             LAST_HEARTBEAT_NANOS.set(0L);
+            updateMainWindowStatus();
             return;
         }
 
@@ -242,6 +257,7 @@ public final class KancolleBridgeStartUp implements StartUp {
                 false
             );
         }
+        updateMainWindowStatus();
     }
 
     private static synchronized void refreshHeartbeatFromTraffic() {
@@ -258,29 +274,121 @@ public final class KancolleBridgeStartUp implements StartUp {
                 false
             );
         }
+        updateMainWindowStatus();
     }
 
     private static synchronized void watchdogTick() {
-        if (chromeState != ChromeState.CONNECTED) {
-            return;
+        if (chromeState == ChromeState.CONNECTED) {
+            long heartbeat = LAST_HEARTBEAT_NANOS.get();
+            if (heartbeat != 0L) {
+                long age = System.nanoTime() - heartbeat;
+                if (age >= HEARTBEAT_TIMEOUT_NANOS) {
+                    chromeState = ChromeState.LOST;
+                    notifyDesktop(
+                        "艦これ環境",
+                        "Chrome/CDP Bridge から30秒以上 heartbeat がありません。艦これの通信取得を確認してください。",
+                        true
+                    );
+                }
+            }
         }
+        updateMainWindowStatus();
+    }
 
-        long heartbeat = LAST_HEARTBEAT_NANOS.get();
-        if (heartbeat == 0L) {
-            return;
+    private static void updateMainWindowStatus() {
+        try {
+            if (!Platform.isFxApplicationThread()) {
+                Platform.runLater(KancolleBridgeStartUp::updateMainWindowStatus);
+                return;
+            }
+
+            Label label = statusLabel;
+            if (label == null || label.getScene() == null) {
+                label = findOrInstallStatusLabel();
+                statusLabel = label;
+            }
+            if (label == null) return;
+
+            long heartbeat = LAST_HEARTBEAT_NANOS.get();
+            long ageSeconds = heartbeat == 0L
+                ? -1L
+                : Math.max(
+                    0L,
+                    TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - heartbeat)
+                );
+
+            String stateText;
+            String color;
+            switch (chromeState) {
+                case CONNECTED -> {
+                    stateText = "接続中";
+                    color = "#137333";
+                }
+                case LOST -> {
+                    stateText = "接続断";
+                    color = "#b3261e";
+                }
+                default -> {
+                    stateText = "待機中";
+                    color = "#8a5a00";
+                }
+            }
+
+            String ageText = ageSeconds < 0L ? "-" : ageSeconds + "秒";
+            label.setText(
+                stateText
+                    + " | HB " + ageText
+                    + " | API " + API_COUNT.get()
+                    + " / 画像 " + IMAGE_COUNT.get()
+                    + " / JSON " + JSON_COUNT.get()
+                    + " | エラー " + ERRORS.get()
+            );
+            label.setStyle("-fx-text-fill:" + color + "; -fx-font-weight:bold;");
+        } catch (Throwable t) {
+            log("main-window status unavailable: " + t);
         }
+    }
 
-        long age = System.nanoTime() - heartbeat;
-        if (age < HEARTBEAT_TIMEOUT_NANOS) {
-            return;
+    private static Label findOrInstallStatusLabel() {
+        for (Window window : Window.getWindows()) {
+            Scene scene = window.getScene();
+            if (scene == null) continue;
+
+            Parent root = scene.getRoot();
+            if (!(root instanceof VBox rootBox)) continue;
+            if (!root.getStyleClass().contains("mainWindow")) continue;
+
+            for (Node node : rootBox.getChildren()) {
+                if (STATUS_BAR_ID.equals(node.getId()) && node instanceof HBox bar) {
+                    for (Node child : bar.getChildren()) {
+                        if (STATUS_LABEL_ID.equals(child.getId()) && child instanceof Label l) {
+                            return l;
+                        }
+                    }
+                }
+            }
+
+            HBox bar = new HBox(8.0);
+            bar.setId(STATUS_BAR_ID);
+            bar.setStyle(
+                "-fx-padding:4 8 4 8;"
+                    + "-fx-background-color:#f1f3f4;"
+                    + "-fx-border-color:#d0d4d8;"
+                    + "-fx-border-width:0 0 1 0;"
+            );
+
+            Label title = new Label("Direct Bridge:");
+            title.setStyle("-fx-font-weight:bold;");
+
+            Label state = new Label("初期化中");
+            state.setId(STATUS_LABEL_ID);
+
+            bar.getChildren().addAll(title, state);
+            int index = Math.min(1, rootBox.getChildren().size());
+            rootBox.getChildren().add(index, bar);
+            return state;
         }
-
-        chromeState = ChromeState.LOST;
-        notifyDesktop(
-            "艦これ環境",
-            "Chrome/CDP Bridge から90秒以上 heartbeat がありません。艦これの通信取得を確認してください。",
-            true
-        );
+        return null;
     }
 
     private static void notifyDesktop(String title, String message, boolean warning) {
