@@ -57,6 +57,12 @@ jobs:
           node --check extension/background.js
           node --check extension/popup.js
 
+      - name: Validate shell scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/build-release.sh
+
       - name: Build release assets
         shell: bash
         env:
