@@ -14,22 +14,25 @@ import logbook.net.ResponseMetaData;
 import logbook.plugin.lifecycle.StartUp;
 
 /**
- * PoC: receives already-captured Kancolle API traffic from the Chrome extension
- * on 127.0.0.1:8891 and feeds it into logbook-kai's existing ContentListenerSpi
- * pipeline. It does not make any request to the Kancolle servers.
+ * Receives already-captured Kancolle traffic from the Chrome extension on
+ * 127.0.0.1:8891 and feeds it into logbook-kai's existing ContentListenerSpi
+ * pipeline. It does not make requests to the Kancolle servers.
  */
 public final class KancolleBridgeStartUp implements StartUp {
     private static final int PORT = 8891;
     private static final int MAGIC = 0x4B435031; // "KCP1"
-    private static final int VERSION = 1;
+    private static final int VERSION_V1 = 1;
+    private static final int VERSION_V2 = 2;
     private static final int MAX_PACKET = 32 * 1024 * 1024;
 
     private static final AtomicLong RECEIVED = new AtomicLong();
     private static final AtomicLong ACCEPTED = new AtomicLong();
+    private static final AtomicLong API_COUNT = new AtomicLong();
+    private static final AtomicLong IMAGE_COUNT = new AtomicLong();
+    private static final AtomicLong JSON_COUNT = new AtomicLong();
     private static final AtomicLong ERRORS = new AtomicLong();
 
     private volatile boolean running = true;
-    private ServerSocket server;
 
     @Override
     public void run() {
@@ -45,7 +48,6 @@ public final class KancolleBridgeStartUp implements StartUp {
         );
 
         try (ServerSocket ss = new ServerSocket()) {
-            this.server = ss;
             ss.setReuseAddress(true);
             ss.bind(new InetSocketAddress(InetAddress.getLoopbackAddress(), PORT), 16);
             log("listening on 127.0.0.1:" + PORT);
@@ -111,6 +113,9 @@ public final class KancolleBridgeStartUp implements StartUp {
             if ("GET".equals(method) && "/health".equals(path)) {
                 String body = "OK received=" + RECEIVED.get()
                     + " accepted=" + ACCEPTED.get()
+                    + " api=" + API_COUNT.get()
+                    + " image=" + IMAGE_COUNT.get()
+                    + " json=" + JSON_COUNT.get()
                     + " errors=" + ERRORS.get();
                 sendText(out, 200, "OK", body);
                 return;
@@ -138,6 +143,7 @@ public final class KancolleBridgeStartUp implements StartUp {
             Packet packet = decode(body);
             dispatch(packet);
             ACCEPTED.incrementAndGet();
+            incrementTypeCounter(packet);
 
             sendText(out, 200, "OK", "ok");
         } catch (Exception e) {
@@ -152,28 +158,110 @@ public final class KancolleBridgeStartUp implements StartUp {
             int version = in.readInt();
             long receivedAt = in.readLong();
 
-            if (magic != MAGIC || version != VERSION) {
-                throw new IOException("unsupported packet");
+            if (magic != MAGIC) {
+                throw new IOException("unsupported packet magic");
             }
 
-            String method = readString(in);
-            String uri = readString(in);
-            String queryString = readString(in);
-            String postData = readString(in);
-            String responseBody = readString(in);
+            if (version == VERSION_V1) {
+                String method = readString(in);
+                String uri = readString(in);
+                String queryString = readString(in);
+                String postData = readString(in);
+                String responseBody = readString(in);
 
-            if (!uri.startsWith("/kcsapi/")) {
-                throw new IOException("unsupported URI: " + uri);
+                validateUri(uri);
+
+                return new Packet(
+                    method, uri, queryString, postData,
+                    "", "text/plain; charset=UTF-8", 200,
+                    responseBody.getBytes(StandardCharsets.UTF_8),
+                    receivedAt
+                );
             }
 
-            return new Packet(method, uri, queryString, postData, responseBody, receivedAt);
+            if (version == VERSION_V2) {
+                String method = readString(in);
+                String uri = readString(in);
+                String queryString = readString(in);
+                String postData = readString(in);
+                String responseEncoding = readString(in);
+                String contentType = readString(in);
+                String statusString = readString(in);
+                String responseBody = readString(in);
+
+                validateUri(uri);
+
+                int status = 200;
+                try {
+                    status = Integer.parseInt(statusString);
+                } catch (NumberFormatException ignored) {}
+
+                byte[] responseBytes;
+                if ("base64".equalsIgnoreCase(responseEncoding)) {
+                    try {
+                        responseBytes = Base64.getDecoder().decode(responseBody);
+                    } catch (IllegalArgumentException e) {
+                        throw new IOException("invalid base64 response body", e);
+                    }
+                } else {
+                    responseBytes = responseBody.getBytes(StandardCharsets.UTF_8);
+                }
+
+                if (contentType == null || contentType.isBlank()) {
+                    contentType = inferContentType(uri, responseEncoding);
+                }
+
+                return new Packet(
+                    method, uri, queryString, postData,
+                    responseEncoding, contentType, status,
+                    responseBytes, receivedAt
+                );
+            }
+
+            throw new IOException("unsupported packet version: " + version);
+        }
+    }
+
+    private static void validateUri(String uri) throws IOException {
+        if (uri.startsWith("/kcsapi/")) return;
+        if (isSupportedKcs2Uri(uri)) return;
+        throw new IOException("unsupported URI: " + uri);
+    }
+
+    private static boolean isSupportedKcs2Uri(String uri) {
+        return uri.startsWith("/kcs2/resources/ship/")
+            || uri.startsWith("/kcs2/resources/map/")
+            || uri.startsWith("/kcs2/resources/gauge/")
+            || uri.startsWith("/kcs2/img/common/")
+            || uri.startsWith("/kcs2/img/duty/")
+            || uri.startsWith("/kcs2/img/sally/");
+    }
+
+    private static String inferContentType(String uri, String encoding) {
+        if (uri.endsWith(".json")) return "application/json";
+        if ("base64".equalsIgnoreCase(encoding)) return "image/png";
+        return "text/plain; charset=UTF-8";
+    }
+
+    private static void incrementTypeCounter(Packet packet) {
+        if (packet.uri().startsWith("/kcsapi/")) {
+            API_COUNT.incrementAndGet();
+        } else if (packet.uri().endsWith(".json")) {
+            JSON_COUNT.incrementAndGet();
+        } else {
+            IMAGE_COUNT.incrementAndGet();
         }
     }
 
     private static void dispatch(Packet packet) {
         long requestAt = System.currentTimeMillis();
         RequestMetaData req = new Req(packet, requestAt);
-        ResponseMetaData res = new Res(packet.responseBody(), System.currentTimeMillis());
+        ResponseMetaData res = new Res(
+            packet.responseBytes(),
+            packet.status(),
+            packet.contentType(),
+            System.currentTimeMillis()
+        );
 
         List<ContentListenerSpi> listeners =
             LogBookCoreServices.getServiceProviders(ContentListenerSpi.class).toList();
@@ -195,7 +283,7 @@ public final class KancolleBridgeStartUp implements StartUp {
 
         log("accepted " + packet.method() + " " + packet.uri()
             + " listeners=" + matched
-            + " response=" + packet.responseBody().length());
+            + " response=" + packet.responseBytes().length);
     }
 
     private record Packet(
@@ -203,7 +291,10 @@ public final class KancolleBridgeStartUp implements StartUp {
         String uri,
         String queryString,
         String postData,
-        String responseBody,
+        String responseEncoding,
+        String contentType,
+        int status,
+        byte[] responseBytes,
         long receivedAt
     ) {}
 
@@ -222,7 +313,10 @@ public final class KancolleBridgeStartUp implements StartUp {
 
         @Override
         public String getContentType() {
-            return "application/x-www-form-urlencoded";
+            if ("POST".equalsIgnoreCase(p.method())) {
+                return "application/x-www-form-urlencoded";
+            }
+            return "";
         }
 
         @Override
@@ -247,6 +341,7 @@ public final class KancolleBridgeStartUp implements StartUp {
 
         @Override
         public Optional<InputStream> getRequestBody() {
+            if (requestBody.length == 0) return Optional.empty();
             return Optional.of(new ByteArrayInputStream(requestBody));
         }
 
@@ -264,21 +359,25 @@ public final class KancolleBridgeStartUp implements StartUp {
 
     private static final class Res implements ResponseMetaData {
         private final byte[] body;
+        private final int status;
+        private final String contentType;
         private final long responseAt;
 
-        Res(String body, long responseAt) {
-            this.body = body.getBytes(StandardCharsets.UTF_8);
+        Res(byte[] body, int status, String contentType, long responseAt) {
+            this.body = body.clone();
+            this.status = status;
+            this.contentType = contentType;
             this.responseAt = responseAt;
         }
 
         @Override
         public int getStatus() {
-            return 200;
+            return status;
         }
 
         @Override
         public String getContentType() {
-            return "text/plain; charset=UTF-8";
+            return contentType;
         }
 
         @Override
