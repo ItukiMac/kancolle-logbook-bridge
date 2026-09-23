@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "艦これ CDP → 航海日誌改 Direct PoC",
-  "version": "0.3.0",
-  "description": "艦これの/kcsapi/をCDPで取得し、localhostの航海日誌改プラグインへ直接渡すPoCです。",
+  "name": "艦これ CDP → 航海日誌改 Direct Bridge",
+  "version": "0.4.0",
+  "description": "艦これの/kcsapi/とMessageFlow互換の/kcs2/画像・JSONをCDPで取得し、localhostの航海日誌改プラグインへ直接渡します。",
   "minimum_chrome_version": "125",
   "permissions": [
     "debugger",
@@ -16,7 +16,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "艦これ Direct PoC",
+    "default_title": "艦これ Direct Bridge",
     "default_popup": "popup.html"
   }
 }
