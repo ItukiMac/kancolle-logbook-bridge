@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "艦これ CDP → 航海日誌改 Direct Bridge",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "艦これ通信をCDPで航海日誌改へ直接渡し、Chrome/航海日誌間の接続不良も相互監視して通知します。",
   "minimum_chrome_version": "125",
   "permissions": [
