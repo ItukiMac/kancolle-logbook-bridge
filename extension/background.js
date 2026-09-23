@@ -334,11 +334,15 @@ function encodePacket(info, postData, result) {
 async function sendDirect(info, postData, result) {
   try {
     const body = encodePacket(info, postData, result);
-    const r = await fetch(PLUGIN_BASE + "/ingest", {
-      method: "POST",
-      headers: { "Content-Type": "application/octet-stream" },
-      body
-    });
+    const r = await fetchWithTimeout(
+      PLUGIN_BASE + "/ingest",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/octet-stream" },
+        body
+      },
+      5000
+    );
     const text = await r.text();
 
     if (!r.ok || text.trim() !== "ok") {
