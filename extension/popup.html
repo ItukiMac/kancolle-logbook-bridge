@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>艦これ Direct PoC</title>
+<title>艦これ Direct Bridge</title>
 <link rel="stylesheet" href="popup.css">
 </head>
 <body>
 <main>
-<h1>艦これ CDP → 航海日誌改 Direct PoC</h1>
+<h1>艦これ CDP → 航海日誌改 Direct Bridge</h1>
 
 <h2>Chrome / CDP</h2>
 <div id="cdp" class="status">確認中…</div>
@@ -24,7 +24,7 @@
 </div>
 
 <p class="note">
-/kcsapi/だけを127.0.0.1:8891へ直接渡します。
+/kcsapi/ に加え、旧MessageFlowが扱っていた /kcs2/ の艦娘・海域・ゲージ・common・duty・sally画像/JSONを127.0.0.1:8891へ直接渡します。
 MessageFlow :8890 は使用しません。
 Cookie・POST本文・レスポンス本文はchrome.storageへ保存しません。
 </p>
