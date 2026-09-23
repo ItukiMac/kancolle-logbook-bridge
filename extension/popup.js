@@ -12,7 +12,7 @@ async function refresh(){
    ? `<span class="ok">connected</span>\n${esc(ps.lastHealth||"")}\n送信: ${esc(ps.sent||0)}`
    : `<span class="err">${esc(ps.status||"unknown")}</span>\nエラー: ${esc(ps.lastError||"なし")}`;
  if(!r.captures?.length){h.innerHTML='<div class="capture muted">まだ取得していません。</div>';return}
- h.innerHTML=r.captures.slice(0,20).map(x=>`<div class="capture">${esc(x.method)} ${esc(x.path)}<br>HTTP=${esc(x.httpStatus)} RESPONSE=${esc(x.responseBytes)}B POST=${esc(x.postDataBytes)}B SVDATA=${x.looksLikeSvdata?"YES":"NO"} SESSION=${esc(x.session)} DIRECT=${x.direct?"YES":"NO"}</div>`).join("");
+ h.innerHTML=r.captures.slice(0,20).map(x=>`<div class="capture">${esc(x.method)} ${esc(x.path)}<br>TYPE=${esc(x.type||"api")} ENCODING=${esc(x.encoding||"text")} HTTP=${esc(x.httpStatus)} RESPONSE=${esc(x.responseBytes)}B POST=${esc(x.postDataBytes)}B SVDATA=${x.looksLikeSvdata?"YES":"NO"} SESSION=${esc(x.session)} DIRECT=${x.direct?"YES":"NO"}</div>`).join("");
 }
 document.getElementById("start").onclick=async()=>{const r=await send({type:"startActive"});if(!r?.ok)alert(r?.error);refresh()};
 document.getElementById("stop").onclick=async()=>{await send({type:"stopActive"});refresh()};
