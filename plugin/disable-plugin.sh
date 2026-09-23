@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 set -eu
-VERSION="${VERSION:-0.4.0}"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
-SRC="$LOGBOOK/plugins/kancolle-cdp-bridge-plugin-v$VERSION.jar"
+SRC="$LOGBOOK/plugins/kancolle-cdp-bridge.jar"
 DST="$SRC.disabled"
 
 if [ ! -f "$SRC" ]; then

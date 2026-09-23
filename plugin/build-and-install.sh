@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="${VERSION:-0.4.0}"
+VERSION="${VERSION:-0.5.0}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
 APP_JAR="$LOGBOOK/logbook-kai.jar"
 PLUGINS="$LOGBOOK/plugins"
-OUT="$PLUGINS/kancolle-cdp-bridge-plugin-v$VERSION.jar"
+OUT="$PLUGINS/kancolle-cdp-bridge.jar"
 
 if [ ! -f "$APP_JAR" ]; then
   echo "NG: $APP_JAR が見つかりません"
