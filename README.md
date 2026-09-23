@@ -82,7 +82,8 @@ JSONはUTF-8テキストとして航海日誌改の既存 `ImageListener` へ渡
 - `logbook-kai-messageflow.jar` を停止した状態で航海日誌改の更新を確認
 - プラグイン受信口は localhost のみ
 - Chrome を `--silent-debugger-extension-api` 付きで起動し、debugger 警告表示を抑止できることを確認
-- v0.4.0で旧MessageFlow相当の `/kcs2/` 画像・JSON経路を実装
+- v0.4系で旧MessageFlow相当の `/kcs2/` 画像・JSON経路を実装・実機確認
+- v0.5.0でChrome拡張と航海日誌改プラグインの相互監視・接続不良通知を追加
 
 詳細は `docs/STATUS.md` を参照してください。
 
@@ -110,6 +111,21 @@ Release版JARには以下のマニフェスト情報を付与します。
 
 Chrome側は `extension/` を `chrome://extensions` の
 「パッケージ化されていない拡張機能を読み込む」から読み込みます。
+
+運用環境では固定パス `$HOME/logbook-kai/cdp-bridge/extension/`、
+プラグインは固定名 `$HOME/logbook-kai/plugins/kancolle-cdp-bridge.jar`
+を推奨します。
+
+## 接続監視
+
+v0.5.0では、艦これタブを監視している間だけChrome拡張が30秒周期で
+`127.0.0.1:8891/heartbeat`へheartbeatを送ります。
+
+- Chrome側: `/ingest`失敗は即時通知、heartbeatは3回連続失敗で通知
+- Plugin側: heartbeatが90秒以上途絶えた場合に `notify-send` で通知
+- 復旧時は双方で1回だけ復旧通知
+- 艦これタブを閉じる/監視停止する場合は `active=false` で監視解除
+- `/health` には `chrome=waiting|connected|lost` と `heartbeatAge` を表示
 
 ## セキュリティ上の注意
 
