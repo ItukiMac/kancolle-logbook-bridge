@@ -5,6 +5,7 @@ const MAX_CAPTURES = 40;
 const HEARTBEAT_ALARM = "bridge-heartbeat";
 const HEARTBEAT_PERIOD_MINUTES = 0.5;
 const FAILURE_THRESHOLD = 3;
+const NOTIFICATION_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAABgUlEQVR4nO3dMQrCQBBAUSMeS0HRYwsWHkwPkCqF2cX/Xp1iis80YZLlfL1/DmQdRw/AWAKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHGn0QPs6f16bnr+cnv8aJJ52ABxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgbpnl17Fbjzb+wQyHJzZAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQN827gD34SNSaDRAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAXOougDUbIE4AcQKIE0CcAOIEECeAOAHECSBOAHECiBNAnADiBBAngDgBxAkgTgBxAogTQJwA4gQQJ4A4AcQJIE4AcQKIE0CcAOIEECeAOAHEfQFMRRD3fdwPowAAAABJRU5ErkJggg==";
 
 const KCS2_PREFIXES = [
   "/kcs2/resources/ship/",
@@ -157,7 +158,7 @@ async function notifyBridge(id, title, message) {
     }
     await chrome.notifications.create(id, {
       type: "basic",
-      iconUrl: chrome.runtime.getURL("icon.svg"),
+      iconUrl: NOTIFICATION_ICON_DATA_URL,
       title,
       message,
       priority: 2
