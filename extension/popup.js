@@ -50,12 +50,12 @@ function render(r) {
 
   if (ps.status === "connected") {
     p.innerHTML =
-      `<span class="ok">connected</span>\n${esc(ps.lastHealth || "")}\n送信: ${esc(ps.sent || 0)}`;
+      `<span class="ok">connected</span>\n${esc(ps.lastHealth || "")}\n送信: ${esc(ps.sent || 0)}\n監視: ${ps.monitoring ? "ON" : "OFF"} / 連続失敗: ${esc(ps.consecutiveFailures || 0)}`;
   } else if (ps.status === "unknown") {
     p.innerHTML = '<span class="muted">health確認中…</span>';
   } else {
     p.innerHTML =
-      `<span class="err">${esc(ps.status || "unknown")}</span>\nエラー: ${esc(ps.lastError || "なし")}`;
+      `<span class="err">${esc(ps.status || "unknown")}</span>\nエラー: ${esc(ps.lastError || "なし")}\n監視: ${ps.monitoring ? "ON" : "OFF"} / 連続失敗: ${esc(ps.consecutiveFailures || 0)}`;
   }
 
   if (!r.captures?.length) {
