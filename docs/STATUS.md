@@ -17,11 +17,12 @@
   - Kancolle CDP Bridge / ItukiMac / version / MIT
 - The unpacked Chrome extension remains registered after reboot from its fixed path.
 
-## Implemented in v0.5.0
+## Implemented in v0.5.x
 
 Connection-loss monitoring and notification:
 
 - Chrome extension sends a heartbeat every 30 seconds while a monitored Kancolle tab is active.
+- v0.5.1 fixes watchdog arming: actual CDP attachment and successful ingest traffic both establish `connected` state.
 - Chrome notifies immediately when `/ingest` fails.
 - Chrome notifies after 3 consecutive heartbeat failures (about 90 seconds).
 - Chrome sends a one-shot recovery notification after connectivity returns.
