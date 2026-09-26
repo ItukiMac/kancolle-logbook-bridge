@@ -1,10 +1,10 @@
-# Design
+# KLB Design
 
 ## Components
 
-### extension/
+### KLB Chrome Extension (`extension/`)
 
-Independent Chrome Manifest V3 extension.
+Chrome Manifest V3 extension for KLB.
 
 Responsibilities:
 
@@ -37,9 +37,9 @@ Protocol v2 extends the original PoC packet with:
 Binary CDP response bodies are transported as base64 text and decoded in the plugin.
 The plugin retains protocol-v1 decoding for compatibility with the v0.3 extension during transition.
 
-### plugin/
+### KLB Logbook Plugin (`plugin/`)
 
-Companion plugin for logbook-kai.
+Companion KLB plugin for logbook-kai.
 
 Responsibilities:
 
