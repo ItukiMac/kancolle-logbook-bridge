@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
 APP_JAR="$LOGBOOK/logbook-kai.jar"
 PLUGINS="$LOGBOOK/plugins"
-OUT="$PLUGINS/kancolle-cdp-bridge.jar"
+OUT="$PLUGINS/klb-logbook-plugin.jar"
 
 if [ ! -f "$APP_JAR" ]; then
   echo "NG: $APP_JAR が見つかりません"
@@ -45,7 +45,7 @@ printf '%s\n' \
 
 cat > "$BUILD/MANIFEST.MF" <<EOF
 Manifest-Version: 1.0
-Implementation-Title: KLB - KanColle Logbook Bridge
+Implementation-Title: KLB Logbook Plugin
 Implementation-Vendor: ItukiMac
 Implementation-Version: $VERSION
 Bundle-License: MIT
@@ -56,16 +56,16 @@ mkdir -p "$PLUGINS"
 (
   cd "$BUILD/classes"
   "$JAR" --create \
-    --file "$BUILD/kancolle-cdp-bridge-plugin-v$VERSION.jar" \
+    --file "$BUILD/klb-logbook-plugin-v$VERSION.jar" \
     --manifest "$BUILD/MANIFEST.MF" \
     .
 )
 
-cp -a "$BUILD/kancolle-cdp-bridge-plugin-v$VERSION.jar" "$OUT"
+cp -a "$BUILD/klb-logbook-plugin-v$VERSION.jar" "$OUT"
 
 echo
 echo "OK: プラグインを新規配置しました"
 echo "$OUT"
 echo
-echo "旧バージョンのDirect Bridgeプラグインが残っている場合は同時に有効化しないでください。"
+echo "旧バージョンのKLB/Direct Bridgeプラグインが残っている場合は同時に有効化しないでください。"
 echo "航海日誌改を再起動してください。"

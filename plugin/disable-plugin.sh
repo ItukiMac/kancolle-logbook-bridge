@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
-SRC="$LOGBOOK/plugins/kancolle-cdp-bridge.jar"
+SRC="$LOGBOOK/plugins/klb-logbook-plugin.jar"
 DST="$SRC.disabled"
 
 if [ ! -f "$SRC" ]; then
