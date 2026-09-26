@@ -14,7 +14,7 @@
 - MessageFlow-compatible `/kcs2/` image/JSON forwarding is verified in actual use.
   - observed: `received=54 accepted=54 api=7 image=34 json=13 errors=0`
 - Plugin metadata is visible in logbook-kai:
-  - Kancolle CDP Bridge / ItukiMac / version / MIT
+  - KLB Logbook Plugin / ItukiMac / version / MIT
 - The unpacked Chrome extension remains registered after reboot from its fixed path.
 
 ## Implemented in v0.5.x / v0.6.0
@@ -40,7 +40,7 @@ Connection-loss monitoring and notification:
 - Connection-loss detection target reduced from about 90 seconds to about 30 seconds.
 - Chrome side alerts on the first failed 30-second heartbeat check.
 - Plugin watchdog timeout reduced to 30 seconds and checks every 5 seconds.
-- Plugin adds a compact Direct Bridge status strip to the logbook-kai main window.
+- Plugin adds a compact KLB status strip to the logbook-kai main window.
 - Status strip shows state, heartbeat age, API/image/JSON counters, and error count.
 - `/health` now includes `timeout=30`.
 - Chrome popup and `/health` remain available as non-notification fallback status views.
