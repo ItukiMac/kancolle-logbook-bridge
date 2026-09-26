@@ -24,8 +24,6 @@ KLB は艦これサーバーへ追加の要求を送るためのツールでは�
 
 Manifest V3 の Chrome 拡張です。
 
-主な処理:
-
 - 艦これの DMM タブへ `chrome.debugger` で接続
 - iframe / OOPIF を自動追跡
 - CDP Network domain から対象通信を取得
@@ -49,7 +47,7 @@ Manifest V3 の Chrome 拡張です。
 航海日誌改の Plugin API を使用します。
 
 - `127.0.0.1:8891` のみで待受
-- KLB のパケットをデコード
+- KLB パケットをデコード
 - 画像 Base64 をバイナリへ復元
 - Request / Response metadata を航海日誌改形式へ変換
 - 既存の `ContentListenerSpi` へ渡す
@@ -58,20 +56,11 @@ Manifest V3 の Chrome 拡張です。
 
 ## Bridge protocol
 
-現在の protocol v2 は以下を保持します。
-
-- request method / URI / query
-- POST data
-- response encoding
-- MIME type
-- HTTP status
-- response body
+protocol v2 は request method / URI / query、POST data、response encoding、MIME type、HTTP status、response body を保持します。
 
 旧 PoC との移行互換用に protocol v1 の decode も残しています。
 
 ## Monitoring
-
-艦これタブ監視中は Chrome 側から heartbeat を送信します。
 
 - heartbeat 間隔: 約30秒
 - Plugin watchdog: 30秒
