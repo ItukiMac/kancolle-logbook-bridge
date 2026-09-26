@@ -1,8 +1,8 @@
-# logbook-kai-cdp-bridge
+# KLB - KanColle Logbook Bridge
 
-Chrome DevTools の `logbook-kai` パネルや `logbook-kai-messageflow.jar` を常用せず、
+KLB (KanColle Logbook Bridge) は、Chrome DevTools の `logbook-kai` パネルや `logbook-kai-messageflow.jar` を常用せず、
 Chrome の `chrome.debugger` / Chrome DevTools Protocol (CDP) で取得した艦これ API・画像・JSON通信を、
-航海日誌改 (`logbook-kai`) のプラグインへ直接渡すためのブリッジです。
+航海日誌改 (`logbook-kai`) のプラグインへ直接渡すためのブリッジです。\n\n**v1.0.0 を初版（first stable release）として扱います。**
 
 ## 位置づけ
 
@@ -105,7 +105,7 @@ docs/OPERATIONS.md  Mint自動起動・バックアップ・OBS録画先確認
 
 Release版JARには以下のマニフェスト情報を付与します。
 
-- Name: Kancolle CDP Bridge
+- Name: KLB - KanColle Logbook Bridge
 - Vendor: ItukiMac
 - Version: リリースバージョン
 - License: MIT
@@ -131,12 +131,12 @@ Chrome拡張は、艦これタブを監視している間だけ30秒周期で
 ## 接続状態の常時表示
 
 v0.6.0 では通知だけに依存せず、航海日誌改のメインウィンドウ上部に
-Direct Bridge の状態ストリップを追加します。
+KLB の状態ストリップを追加します。
 
 表示例:
 
 ```text
-Direct Bridge: 接続中 | HB 2秒 | API 6 / 画像 26 / JSON 13 | エラー 0
+KLB: 接続中 | HB 2秒 | API 6 / 画像 26 / JSON 13 | エラー 0
 ```
 
 状態は `接続中 / 待機中 / 接続断` で表示されます。
