@@ -103,4 +103,16 @@ jobs:
             gh release create "$TAG"               --target "$GITHUB_SHA"               --title "$TAG"               --notes-file "$NOTES"
           fi
 
-          gh release upload "$TAG" --clobber             "dist/klb-v$VERSION.zip"             "dist/klb-chrome-extension-v$VERSION.zip"             "dist/klb-logbook-plugin-v$VERSION.jar"             "dist/SHA256SUMS-v$VERSION.txt"
+          # Remove legacy pre-KLB asset names when republishing the same tag.
+          for old in \
+            "logbook-kai-cdp-bridge-v$VERSION.zip" \
+            "logbook-kai-cdp-bridge-extension-v$VERSION.zip" \
+            "kancolle-cdp-bridge-plugin-v$VERSION.jar"; do
+            gh release delete-asset "$TAG" "$old" -y >/dev/null 2>&1 || true
+          done
+
+          gh release upload "$TAG" --clobber \
+            "dist/klb-v$VERSION.zip" \
+            "dist/klb-chrome-extension-v$VERSION.zip" \
+            "dist/klb-logbook-plugin-v$VERSION.jar" \
+            "dist/SHA256SUMS-v$VERSION.txt"
