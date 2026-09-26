@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-VERSION="${VERSION:-0.5.0}"
+VERSION="${VERSION:-1.0.0}"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 LOGBOOK="${LOGBOOK_DIR:-$HOME/logbook-kai}"
 APP_JAR="$LOGBOOK/logbook-kai.jar"
@@ -45,7 +45,7 @@ printf '%s\n' \
 
 cat > "$BUILD/MANIFEST.MF" <<EOF
 Manifest-Version: 1.0
-Implementation-Title: Kancolle CDP Bridge
+Implementation-Title: KLB - KanColle Logbook Bridge
 Implementation-Vendor: ItukiMac
 Implementation-Version: $VERSION
 Bundle-License: MIT
