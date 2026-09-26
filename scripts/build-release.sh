@@ -63,7 +63,7 @@ STAGE="$WORK/klb-v$VERSION"
 mkdir -p "$STAGE/extension" "$STAGE/plugin" "$STAGE/docs"
 cp -a "$ROOT/extension/." "$STAGE/extension/"
 cp -a "$PLUGIN_JAR" "$STAGE/plugin/"
-cp -a "$ROOT/README.md" "$ROOT/LICENSE" "$ROOT/NOTICE.md" "$ROOT/ACKNOWLEDGEMENTS.md" "$STAGE/"
+cp -a "$ROOT/README.md" "$ROOT/LICENSE" "$ROOT/NOTICE.md" "$STAGE/"
 cp -a "$ROOT/docs/." "$STAGE/docs/"
 [[ -f "$NOTES" ]] && cp -a "$NOTES" "$STAGE/RELEASE_NOTES.md"
 
