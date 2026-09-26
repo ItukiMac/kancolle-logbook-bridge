@@ -6,7 +6,7 @@ KLB は、Google Chrome で動作する艦これと **航海日誌改 (logbook-k
 
 | コンポーネント | 役割 |
 | --- | --- |
-| **KLB Chrome Extension** | Chrome 上の艦これ通信を取得し、ローカルの KLB Logbook Plugin へ渡します。 |
+| **KLB Chrome Extension** | Chrome 上の艦これ通信を取得し、KLB Logbook Plugin へ渡します。 |
 | **KLB Logbook Plugin** | 受け取ったデータを航海日誌改へ渡します。 |
 
 通常利用では旧 `logbook-kai-messageflow.jar` は不要です。
