@@ -30,10 +30,10 @@ cp "$ROOT/LICENSE" "$WORK/classes/META-INF/LICENSE"
 rm -f "$DIST/"*
 
 PLUGIN_SRC="$ROOT/plugin/src/local/kancolle/bridge/KancolleBridgeStartUp.java"
-PLUGIN_NAME="kancolle-cdp-bridge-plugin-v$VERSION.jar"
+PLUGIN_NAME="klb-logbook-plugin-v$VERSION.jar"
 PLUGIN_JAR="$DIST/$PLUGIN_NAME"
-EXT_ZIP="$DIST/logbook-kai-cdp-bridge-extension-v$VERSION.zip"
-FULL_ZIP="$DIST/logbook-kai-cdp-bridge-v$VERSION.zip"
+EXT_ZIP="$DIST/klb-chrome-extension-v$VERSION.zip"
+FULL_ZIP="$DIST/klb-v$VERSION.zip"
 NOTES="$ROOT/release/v$VERSION/RELEASE_NOTES.md"
 
 javac -encoding UTF-8 -cp "$LOGBOOK_JAR" -d "$WORK/classes" "$PLUGIN_SRC"
@@ -43,7 +43,7 @@ printf '%s\n' 'local.kancolle.bridge.KancolleBridgeStartUp' \
 
 cat > "$WORK/MANIFEST.MF" <<EOF
 Manifest-Version: 1.0
-Implementation-Title: KLB - KanColle Logbook Bridge
+Implementation-Title: KLB Logbook Plugin
 Implementation-Vendor: ItukiMac
 Implementation-Version: $VERSION
 Bundle-License: MIT
@@ -59,11 +59,12 @@ EOF
   zip -qr "$EXT_ZIP" .
 )
 
-STAGE="$WORK/logbook-kai-cdp-bridge-v$VERSION"
-mkdir -p "$STAGE/extension" "$STAGE/plugin"
+STAGE="$WORK/klb-v$VERSION"
+mkdir -p "$STAGE/extension" "$STAGE/plugin" "$STAGE/docs"
 cp -a "$ROOT/extension/." "$STAGE/extension/"
 cp -a "$PLUGIN_JAR" "$STAGE/plugin/"
 cp -a "$ROOT/README.md" "$ROOT/LICENSE" "$ROOT/NOTICE.md" "$ROOT/ACKNOWLEDGEMENTS.md" "$STAGE/"
+cp -a "$ROOT/docs/." "$STAGE/docs/"
 [[ -f "$NOTES" ]] && cp -a "$NOTES" "$STAGE/RELEASE_NOTES.md"
 
 cat > "$STAGE/plugin/install.sh" <<EOF
@@ -71,7 +72,7 @@ cat > "$STAGE/plugin/install.sh" <<EOF
 set -euo pipefail
 LOGBOOK_DIR="\${LOGBOOK_DIR:-\$HOME/logbook-kai}"
 SRC="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)/$PLUGIN_NAME"
-DST="\$LOGBOOK_DIR/plugins/$PLUGIN_NAME"
+DST="\$LOGBOOK_DIR/plugins/klb-logbook-plugin.jar"
 
 mkdir -p "\$LOGBOOK_DIR/plugins"
 
@@ -83,7 +84,7 @@ fi
 
 cp -a "\$SRC" "\$DST"
 echo "OK: \$DST"
-echo "旧バージョンのDirect Bridgeプラグインが残っている場合は同時に有効化しないでください。"
+echo "旧バージョンのKLB/Direct Bridgeプラグインが残っている場合は同時に有効化しないでください。"
 echo "航海日誌改を再起動してください。"
 EOF
 
