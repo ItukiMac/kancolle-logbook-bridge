@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "艦これ CDP → 航海日誌改 Direct Bridge",
-  "version": "0.6.0",
+  "name": "KLB - KanColle Logbook Bridge",
+  "version": "1.0.0",
   "description": "艦これ通信をCDPで航海日誌改へ直接渡し、Chrome/航海日誌間の接続不良も相互監視して通知します。",
   "minimum_chrome_version": "125",
   "permissions": [
@@ -17,8 +17,12 @@
   "background": {
     "service_worker": "background.js"
   },
+  "icons": {
+    "128": "icon128.png"
+  },
   "action": {
-    "default_title": "艦これ Direct Bridge",
-    "default_popup": "popup.html"
+    "default_title": "KLB",
+    "default_popup": "popup.html",
+    "default_icon": "icon128.png"
   }
 }
