@@ -92,7 +92,7 @@ cat > "$STAGE/plugin/disable.sh" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
 LOGBOOK_DIR="\${LOGBOOK_DIR:-\$HOME/logbook-kai}"
-SRC="\$LOGBOOK_DIR/plugins/$PLUGIN_NAME"
+SRC="\$LOGBOOK_DIR/plugins/klb-logbook-plugin.jar"
 DST="\$SRC.disabled"
 
 if [[ ! -f "\$SRC" ]]; then
