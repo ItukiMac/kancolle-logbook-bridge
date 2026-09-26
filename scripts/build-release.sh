@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${VERSION:-0.6.1}"
+VERSION="${VERSION:-1.0.0}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 LOGBOOK_JAR="${LOGBOOK_JAR:-$HOME/logbook-kai/logbook-kai.jar}"
 WORK="$ROOT/.release-build"
@@ -43,7 +43,7 @@ printf '%s\n' 'local.kancolle.bridge.KancolleBridgeStartUp' \
 
 cat > "$WORK/MANIFEST.MF" <<EOF
 Manifest-Version: 1.0
-Implementation-Title: Kancolle CDP Bridge
+Implementation-Title: KLB - KanColle Logbook Bridge
 Implementation-Vendor: ItukiMac
 Implementation-Version: $VERSION
 Bundle-License: MIT
