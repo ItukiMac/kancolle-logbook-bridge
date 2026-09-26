@@ -95,7 +95,7 @@ public final class KancolleBridgeStartUp implements StartUp {
             log("ERROR: port " + PORT + " is already in use: " + e);
             notifyDesktop(
                 "艦これ環境",
-                "Direct Bridge :8891 の待受に失敗しました。航海日誌連携を確認してください。",
+                "KLB :8891 の待受に失敗しました。航海日誌連携を確認してください。",
                 true
             );
         } catch (SocketException e) {
@@ -253,7 +253,7 @@ public final class KancolleBridgeStartUp implements StartUp {
         if (previous == ChromeState.LOST) {
             notifyDesktop(
                 "艦これ環境",
-                "Chrome/CDP Bridge の接続が復旧しました。",
+                "KLB の接続が復旧しました。",
                 false
             );
         }
@@ -270,7 +270,7 @@ public final class KancolleBridgeStartUp implements StartUp {
         if (previous == ChromeState.LOST) {
             notifyDesktop(
                 "艦これ環境",
-                "Chrome/CDP Bridge の接続が復旧しました。",
+                "KLB の接続が復旧しました。",
                 false
             );
         }
@@ -286,7 +286,7 @@ public final class KancolleBridgeStartUp implements StartUp {
                     chromeState = ChromeState.LOST;
                     notifyDesktop(
                         "艦これ環境",
-                        "Chrome/CDP Bridge から30秒以上 heartbeat がありません。艦これの通信取得を確認してください。",
+                        "KLB から30秒以上 heartbeat がありません。艦これの通信取得を確認してください。",
                         true
                     );
                 }
@@ -377,7 +377,7 @@ public final class KancolleBridgeStartUp implements StartUp {
                     + "-fx-border-width:0 0 1 0;"
             );
 
-            Label title = new Label("Direct Bridge:");
+            Label title = new Label("KLB:");
             title.setStyle("-fx-font-weight:bold;");
 
             Label state = new Label("初期化中");
