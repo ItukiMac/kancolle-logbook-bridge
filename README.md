@@ -58,6 +58,14 @@ Chrome で `chrome://extensions/` を開き、
 - 利用によって生じた損害について作者は保証しません。自己責任で利用してください。
 - 本リポジトリのコードは [MIT License](LICENSE) で提供します。
 
-## Upstream / 謝辞
+## 関連プロジェクト
 
-関連プロジェクトとライセンス上の位置づけは [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) を参照してください。
+KLB は以下のプロジェクトと関係があります。
+
+- [航海日誌改 (logbook-kai)](https://github.com/sakura0689/logbook-kai)  
+  **KLB Logbook Plugin** は、航海日誌改が公開している Plugin API を利用します。KLB は航海日誌改の公式機能・forkではなく、航海日誌改本体も同梱しません。
+
+- [logbook-kai-messageflow](https://github.com/sakura0689/logbook-kai-messageflow)  
+  KLB は従来の `Chrome → MessageFlow → 航海日誌改` 構成を置き換える目的で開発され、公開されている通信フローや挙動を参考にしています。現在の KLB は MessageFlow をビルド時・実行時ともに必要としません。
+
+両プロジェクトは MIT License で公開されています。
