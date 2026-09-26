@@ -78,9 +78,9 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           set -euo pipefail
-          test -f "dist/logbook-kai-cdp-bridge-v$VERSION.zip"
-          test -f "dist/logbook-kai-cdp-bridge-extension-v$VERSION.zip"
-          test -f "dist/kancolle-cdp-bridge-plugin-v$VERSION.jar"
+          test -f "dist/klb-v$VERSION.zip"
+          test -f "dist/klb-chrome-extension-v$VERSION.zip"
+          test -f "dist/klb-logbook-plugin-v$VERSION.jar"
           test -f "dist/SHA256SUMS-v$VERSION.txt"
           (
             cd dist
@@ -103,4 +103,4 @@ jobs:
             gh release create "$TAG"               --target "$GITHUB_SHA"               --title "$TAG"               --notes-file "$NOTES"
           fi
 
-          gh release upload "$TAG" --clobber             "dist/logbook-kai-cdp-bridge-v$VERSION.zip"             "dist/logbook-kai-cdp-bridge-extension-v$VERSION.zip"             "dist/kancolle-cdp-bridge-plugin-v$VERSION.jar"             "dist/SHA256SUMS-v$VERSION.txt"
+          gh release upload "$TAG" --clobber             "dist/klb-v$VERSION.zip"             "dist/klb-chrome-extension-v$VERSION.zip"             "dist/klb-logbook-plugin-v$VERSION.jar"             "dist/SHA256SUMS-v$VERSION.txt"
