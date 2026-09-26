@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "KLB - KanColle Logbook Bridge",
+  "name": "KLB Chrome Extension",
   "version": "1.0.0",
-  "description": "艦これ通信をCDPで航海日誌改へ直接渡し、Chrome/航海日誌間の接続不良も相互監視して通知します。",
+  "description": "KLBのChrome側コンポーネント。艦これ通信をKLB Logbook Pluginへ直接渡し、接続状態を監視します。",
   "minimum_chrome_version": "125",
   "permissions": [
     "debugger",
@@ -21,7 +21,7 @@
     "128": "icon128.png"
   },
   "action": {
-    "default_title": "KLB",
+    "default_title": "KLB Chrome Extension",
     "default_popup": "popup.html",
     "default_icon": "icon128.png"
   }
