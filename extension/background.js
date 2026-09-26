@@ -5,7 +5,7 @@ const MAX_CAPTURES = 40;
 const HEARTBEAT_ALARM = "bridge-heartbeat";
 const HEARTBEAT_PERIOD_MINUTES = 0.5;
 const FAILURE_THRESHOLD = 1;
-const NOTIFICATION_ICON_DATA_URL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAE2klEQVR42u2dPW7UQBiG7dFGiijpoOAMiUwRabNtGqQoDRwAhRukTrE1NyDiAGwTRUpDG5AosLhDCugoo0grbWjYxOv1z8x4xv7G8zxSJMI6rPH7zDc/9k6SBAAAAAAA4iLt641efXl44HKbcfsuTYMVgMDDECIl+LhFSAk+bhEU4YeLi+ue9nUCu/OMxAy5P8+9V4PUZ/iE3q8MNhKkPsIn+OFEMJUgdRk+wcsQwUQCRfhh0nS9TcZmyvfJwDASOBegzirClymBbhVQhB+3BMr1m0JY3YGybf0QBm35KVp/3FVA0frjrgKK1h93FVBcsrhBAATQ7zco/+F2A3XjACoAFQAQABAAEAAQABAAEAAQABAAYmDCJTDj188fIs5j//VB+AJ8/3az8f30cEb4BufiQgK6gADDd3lOCBBo+K7ODQEYBIINL99fDvK+vz+fMA30Nie+yBN1kcf1fyb2p/Cr/owAkYUfmwQIkCTJ6jRLVqdxPu+IAIaVgVlAB8orf22v+1gZXIda1eJXpxmDwNgHemUxxi5E1F1AbK198C5AwmCvHLq6yLdafd9dwZuPbxtfvz5bUAFcSiCJtvB1jxFbAdoGfkMPCuuqgITgq49f0gX46AokhF8u9VXHffi7k3x67k4C1gE6dBU2pVk3/Lq/cxl+kjTsFOrj08Gm3YHvJ4TKVaBuCpjvLStboukgrSp8k5+9PltU3g2sejKoaifRqh1EuR1sQTH8YrB1YZq0+r5nAnQBFtSV4aqgXYTPOoBArs8WRoFLDB8BHEhgMhiUFHw0Aqim/fVvW479/3p2u5Pkx0vjaiA9/NEIoM79z+mzq82B34uTp8D/XC7EBjxKAfoI3ISiDGshEGDEgY9JCLECzL4+Cy54HSGkyTCRGLxLVhWrl20rgOVj8r3l1higqwxSRJiMIfiVwRK17U2g8iyg+MGQcskPSYTOAnS53Wsb/M3R3cb307l9+G2tv47NNfll44xBR4SmaeYoK4Bp8OXQnXQPnp4BKIapK8P6uL5F6HwvwOaOnW74N0d3j18u3r8YeF34VeODLp/Dz4+Xj1826w1tdN0jYCKt1fto6bqtvqn0778+6PxRbN3KoFsNxGwQodMK28Jva+lDUJbF1bYsxcpgWw2C2iKmKfwuobt6YMRkZmB64duqxlqCurCzqx2jWc4gFaApDF/h++4W+n5ItClknwtiaoiWL73cD/Xo+Gqe1YrgSwKnAhSrQFP4fY07bCSQ8LmBPiVQfbd8kCVBb9PAMYfvYhex6n9j+x6E6wGh8wowPZxt9fGuw5e+oaRLilNFH7OBCa0+3O5ArADTw1nnm0QxtvYhEHM7mKBHJkBTFRhb2C6XiEdXAWjZslGEjwCAAIAAgACAAIAAgACAAIAAgACAAIAAgACAAIAAgACAABCDAFVbi9+f80uWQkB3q3gqACAAAjgoLyC7/FsLUNdvQFg05aj6sAxktn4tAagC4239nQaBVIHwW7+2AHUWIYHs8HWqt3YFQILxhe9sHQAJwir71gI0WYUEcsI3GbhbjfCrfq1skd15RkIDtXrTWZv1FK9NAkTov9zbTNk7zfF1JECGfvp42/UaJ4s8JiKAW7ou1CkJJwHDXXfnwVENwgjemwCIEEbw3gVACLpWAAAAABDKPz/9OCeAHH28AAAAAElFTkSuQmCC";
+const NOTIFICATION_ICON_DATA_URL = "icon128.png";
 
 const KCS2_PREFIXES = [
   "/kcs2/resources/ship/",
@@ -185,7 +185,7 @@ async function markPluginSuccess(healthText = null) {
     pluginState.alerted = false;
     await notifyBridge(
       "bridge-up",
-      "艦これ Direct Bridge",
+      "KLB",
       "航海日誌改との接続が復旧しました。"
     );
   }
@@ -207,7 +207,7 @@ async function markPluginFailure(error, immediate = false) {
     pluginState.alerted = true;
     await notifyBridge(
       "bridge-down",
-      "艦これ Direct Bridge 接続エラー",
+      "KLB 接続エラー",
       immediate
         ? "航海日誌改へのデータ送信に失敗しました。ログ取得状態を確認してください。"
         : "航海日誌改プラグインへ約30秒接続できません。ログ取得状態を確認してください。"
