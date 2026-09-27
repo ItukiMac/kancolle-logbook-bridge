@@ -82,6 +82,7 @@ jobs:
           test -f "dist/klb-chrome-extension-v$VERSION.zip"
           test -f "dist/klb-logbook-plugin-v$VERSION.jar"
           test -f "dist/SHA256SUMS-v$VERSION.txt"
+          python3 scripts/verify-release-licenses.py "$VERSION"
           (
             cd dist
             sha256sum -c "SHA256SUMS-v$VERSION.txt"

@@ -13,12 +13,15 @@ if [[ ! -f "$LOGBOOK_JAR" ]]; then
   exit 1
 fi
 
-for cmd in javac jar zip sha256sum; do
+for cmd in javac jar zip sha256sum cmp python3; do
   command -v "$cmd" >/dev/null 2>&1 || {
     echo "NG: $cmd が見つかりません" >&2
     exit 1
   }
 done
+
+# Ensure standalone extension distributions carry the canonical license.
+cmp "$ROOT/LICENSE" "$ROOT/extension/LICENSE"
 
 case "$WORK" in "$ROOT"/.release-build) ;; *) exit 1 ;; esac
 case "$DIST" in "$ROOT"/dist) ;; *) exit 1 ;; esac
@@ -124,7 +127,7 @@ chmod +x "$STAGE/plugin/install.sh" "$STAGE/plugin/disable.sh"
     > "SHA256SUMS-v$VERSION.txt"
 )
 
+python3 "$ROOT/scripts/verify-release-licenses.py" "$VERSION"
+
 echo "Release files:"
 ls -lh "$DIST"
-
-python3 "$ROOT/scripts/verify-release-licenses.py" "$VERSION"
