@@ -4,7 +4,7 @@ KLB は、Google Chrome で動作する艦これと **航海日誌改 (logbook-k
 
 ## 構成図
 
-[![KLB 構成図](docs/images/klb-architecture.png)](docs/images/klb-architecture.png)
+[![KLB 構成図](docs/images/klb-architecture-annotated.svg)](docs/images/klb-architecture-annotated.svg)
 
 Google Chrome および Google Chrome ロゴは Google LLC の商標です。その他の権利表示は [NOTICE.md](NOTICE.md) を参照してください。
 
