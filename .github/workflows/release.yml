@@ -1,119 +1,119 @@
-name: Build and publish release
+name: Validate product and publish new versions
 
 on:
   push:
-    branches:
-      - main
-    paths:
-      - release/RELEASE
+    branches: ['**']
+    tags: ['**']
+  pull_request:
 
 permissions:
-  contents: write
-
-concurrency:
-  group: release-publish
-  cancel-in-progress: false
+  contents: read
 
 jobs:
-  release:
+  verify:
     runs-on: ubuntu-latest
-
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      publish: ${{ steps.version.outputs.publish }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
-
-      - name: Read release version
+      - name: Validate source, identities and complete fetched history
+        run: python3 scripts/verify-publication.py
+      - name: Test validators and mocked publication failures
+        run: |
+          python3 -m unittest discover -s tests -v
+          python3 -O -m unittest discover -s tests -v
+      - name: Read version and publication trigger
         id: version
         shell: bash
         run: |
-          set -euo pipefail
-          VERSION="$(tr -d '[:space:]' < release/RELEASE)"
-          test -n "$VERSION"
-          test -f "release/v$VERSION/RELEASE_NOTES.md"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
-
-      - name: Download logbook-kai build dependency
+          python3 - <<'PY'
+          import json, os, re, subprocess
+          from pathlib import Path
+          version = Path('release/RELEASE').read_text().strip()
+          if not re.fullmatch(r'(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)', version):
+              raise SystemExit('invalid release version')
+          if not Path(f'release/v{version}/RELEASE_NOTES.md').is_file():
+              raise SystemExit('missing release notes')
+          publish = False
+          event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text())
+          before = event.get('before', '')
+          if os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF'] == 'refs/heads/main' and re.fullmatch('[0-9a-f]{40}', before) and before != '0' * 40:
+              paths = subprocess.check_output(['git', 'diff', '--name-only', before, 'HEAD', '--', 'release/RELEASE'])
+              publish = bool(paths.strip())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\npublish={str(publish).lower()}\n')
+          PY
+      - name: Download pinned build dependency
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p .upstream-logbook
-          curl -fL             -o .upstream-logbook/logbook-kai.zip             https://github.com/sakura0689/logbook-kai/releases/download/v25.0.8/logbook-kai_25.0.8.zip
+          curl --fail --location --silent --show-error -o .upstream-logbook/logbook-kai.zip https://github.com/sakura0689/logbook-kai/releases/download/v25.0.8/logbook-kai_25.0.8.zip
+          echo 'd24b2aba8658b1acc6f4081604ce4280091cc714519ada957f9eaa6d240943c5  .upstream-logbook/logbook-kai.zip' | sha256sum -c -
           unzip -q .upstream-logbook/logbook-kai.zip -d .upstream-logbook/extracted
           LOGBOOK_JAR="$(find .upstream-logbook/extracted -type f -name logbook-kai.jar -print -quit)"
           test -n "$LOGBOOK_JAR"
           echo "LOGBOOK_JAR=$LOGBOOK_JAR" >> "$GITHUB_ENV"
-
-      - name: Validate extension JavaScript
-        shell: bash
+      - name: Validate syntax and build product packages
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          set -euo pipefail
           node --check extension/background.js
           node --check extension/popup.js
+          for script in scripts/build-release.sh plugin/build-and-install.sh plugin/disable-plugin.sh; do
+            bash -n "$script"
+          done
+          bash scripts/build-release.sh
+          python3 -O scripts/verify-release-licenses.py "$VERSION"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: verified-product-${{ github.sha }}
+          path: dist/*
+          if-no-files-found: error
 
-      - name: Validate shell scripts
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash -n scripts/build-release.sh
-
-      - name: Build release assets
-        shell: bash
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          chmod +x scripts/build-release.sh
-          ./scripts/build-release.sh
-
-      - name: Verify release assets
-        shell: bash
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          set -euo pipefail
-          test -f "dist/klb-v$VERSION.zip"
-          test -f "dist/klb-chrome-extension-v$VERSION.zip"
-          test -f "dist/klb-logbook-plugin-v$VERSION.jar"
-          test -f "dist/SHA256SUMS-v$VERSION.txt"
-          python3 scripts/verify-release-licenses.py "$VERSION"
-          (
-            cd dist
-            sha256sum -c "SHA256SUMS-v$VERSION.txt"
-          )
-
-      - name: Publish GitHub Release
-        shell: bash
+  publish:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.verify.outputs.publish == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: new-release-publication
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: verified-product-${{ github.sha }}
+          path: dist
+      - name: Publish only a new verified version
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          set -euo pipefail
-          NOTES="release/v$VERSION/RELEASE_NOTES.md"
-
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG"               --title "$TAG"               --notes-file "$NOTES"
-          else
-            gh release create "$TAG"               --target "$GITHUB_SHA"               --title "$TAG"               --notes-file "$NOTES"
-          fi
-
-          # Remove legacy pre-KLB asset names when republishing the same tag.
-          for old in \
-            "logbook-kai-cdp-bridge-v$VERSION.zip" \
-            "logbook-kai-cdp-bridge-extension-v$VERSION.zip" \
-            "kancolle-cdp-bridge-plugin-v$VERSION.jar"; do
-            gh release delete-asset "$TAG" "$old" -y >/dev/null 2>&1 || true
-          done
-
-          gh release upload "$TAG" --clobber \
-            "dist/klb-v$VERSION.zip" \
-            "dist/klb-chrome-extension-v$VERSION.zip" \
-            "dist/klb-logbook-plugin-v$VERSION.jar" \
-            "dist/SHA256SUMS-v$VERSION.txt"
+          VERSION: ${{ needs.verify.outputs.version }}
+        run: python3 scripts/publish_release.py "$VERSION" --repository "$GITHUB_REPOSITORY" --commit "$GITHUB_SHA" --state "$RUNNER_TEMP/publication-state.jsonl"
+      - name: Preserve publication state, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: publication-state-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/publication-state.jsonl
+          if-no-files-found: warn

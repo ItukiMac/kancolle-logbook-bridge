@@ -3,3 +3,7 @@ build/
 *.jar
 *.log
 .DS_Store
+.release-build/
+dist/
+.upstream-logbook/
+__pycache__/

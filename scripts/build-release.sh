@@ -21,6 +21,7 @@ for cmd in javac jar zip sha256sum cmp python3; do
 done
 
 # Ensure standalone extension distributions carry the canonical license.
+python3 "$ROOT/scripts/verify-publication.py" --source-only
 cmp "$ROOT/LICENSE" "$ROOT/extension/LICENSE"
 
 case "$WORK" in "$ROOT"/.release-build) ;; *) exit 1 ;; esac

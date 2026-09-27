@@ -1,0 +1,72 @@
+{
+  "source_files": [
+    ".github/workflows/release.yml",
+    ".gitignore",
+    "LICENSE",
+    "NOTICE.md",
+    "README.md",
+    "docs/DESIGN.md",
+    "docs/OPERATIONS.md",
+    "docs/STATUS.md",
+    "docs/TECHNICAL.md",
+    "docs/images/klb-architecture-annotated.svg",
+    "docs/images/klb-architecture.png",
+    "extension/LICENSE",
+    "extension/NOTICE.md",
+    "extension/background.js",
+    "extension/icon.svg",
+    "extension/icon128.png",
+    "extension/manifest.json",
+    "extension/popup.css",
+    "extension/popup.html",
+    "extension/popup.js",
+    "plugin/build-and-install.sh",
+    "plugin/disable-plugin.sh",
+    "plugin/src/local/kancolle/bridge/KancolleBridgeStartUp.java",
+    "publication-policy.json",
+    "release/RELEASE",
+    "release/v0.3.0/RELEASE_NOTES.md",
+    "release/v0.3.0/SHA256SUMS.txt",
+    "release/v0.4.0/RELEASE_NOTES.md",
+    "release/v0.4.1/RELEASE_NOTES.md",
+    "release/v0.4.2/RELEASE_NOTES.md",
+    "release/v0.5.0/RELEASE_NOTES.md",
+    "release/v0.5.1/RELEASE_NOTES.md",
+    "release/v0.5.2/RELEASE_NOTES.md",
+    "release/v0.5.3/RELEASE_NOTES.md",
+    "release/v0.5.4/RELEASE_NOTES.md",
+    "release/v0.6.0/RELEASE_NOTES.md",
+    "release/v0.6.1/RELEASE_NOTES.md",
+    "release/v1.0.0/RELEASE_NOTES.md",
+    "scripts/build-release.sh",
+    "scripts/publication_checks.py",
+    "scripts/publish_release.py",
+    "scripts/verify-publication.py",
+    "scripts/verify-release-licenses.py",
+    "tests/test_publication.py"
+  ],
+  "jar_files": [
+    "META-INF/LICENSE",
+    "META-INF/MANIFEST.MF",
+    "META-INF/NOTICE.md",
+    "META-INF/services/logbook.plugin.lifecycle.StartUp",
+    "local/kancolle/bridge/KancolleBridgeStartUp$ChromeState.class",
+    "local/kancolle/bridge/KancolleBridgeStartUp$Packet.class",
+    "local/kancolle/bridge/KancolleBridgeStartUp$Req.class",
+    "local/kancolle/bridge/KancolleBridgeStartUp$Res.class",
+    "local/kancolle/bridge/KancolleBridgeStartUp.class"
+  ],
+  "allowed_emails": [
+    "266446300+ItukiMac@users.noreply.github.com"
+  ],
+  "owner_names": [
+    "ItukiMac"
+  ],
+  "owner_email": "266446300+ItukiMac@users.noreply.github.com",
+  "required_notices": {
+    "LICENSE": "aad9396d0c3c2f1625ad2acc4f529a87c99607d15184de6121f5576e8d0b369a",
+    "NOTICE.md": "b889f81c606eae6c3ea4b3a4a4ff9a7882ebc9499f9fc5e1a10f753dac977249",
+    "extension/LICENSE": "aad9396d0c3c2f1625ad2acc4f529a87c99607d15184de6121f5576e8d0b369a",
+    "extension/NOTICE.md": "b889f81c606eae6c3ea4b3a4a4ff9a7882ebc9499f9fc5e1a10f753dac977249"
+  }
+}
