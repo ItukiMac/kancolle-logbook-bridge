@@ -28,6 +28,10 @@ let pluginState = {
   monitoring: false,
   consecutiveFailures: 0,
   alerted: false,
+  ingestFailures: 0,
+  lastIngestError: null,
+  lastIngestFailureAt: null,
+  lastIngestSuccessAt: null,
   updatedAt: null
 };
 
@@ -180,6 +184,13 @@ async function markPluginSuccess(healthText = null) {
   pluginState.lastError = null;
   pluginState.consecutiveFailures = 0;
   updateAcceptedFromHealth(healthText);
+
+  // A healthy heartbeat is not evidence that a failed ingest was delivered.
+  // Keep the ingest failure visible until a successful ingest occurs.
+  if (pluginState.lastIngestError) {
+    await saveState();
+    return;
+  }
 
   if (hadAlert) {
     pluginState.alerted = false;
@@ -388,10 +399,22 @@ async function sendDirect(info, postData, result) {
 
     pluginState.sent += 1;
     pluginState.monitoring = true;
+    pluginState.lastIngestError = null;
+    pluginState.lastIngestSuccessAt = nowIso();
     await markPluginSuccess();
     return true;
   } catch (e) {
+    // Preserve the diagnostic even when a later heartbeat succeeds. Do not
+    // retry automatically: the server may have accepted a timed-out packet.
+    pluginState.ingestFailures = Number(pluginState.ingestFailures || 0) + 1;
+    pluginState.lastIngestError = String(e?.message || e);
+    pluginState.lastIngestFailureAt = nowIso();
     await markPluginFailure(e, true);
+    console.warn("KLB ingest failed", {
+      reason: pluginState.lastIngestError,
+      at: pluginState.lastIngestFailureAt,
+      failureCount: pluginState.ingestFailures
+    });
     return false;
   }
 }
