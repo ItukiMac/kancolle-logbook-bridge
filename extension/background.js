@@ -32,6 +32,7 @@ let pluginState = {
   lastIngestError: null,
   lastIngestFailureAt: null,
   lastIngestSuccessAt: null,
+  ingestFailureOutstanding: false,
   updatedAt: null
 };
 
@@ -180,17 +181,16 @@ function updateAcceptedFromHealth(text) {
 async function markPluginSuccess(healthText = null) {
   await ensurePluginStateLoaded();
   const hadAlert = Boolean(pluginState.alerted);
-  pluginState.status = "connected";
-  pluginState.lastError = null;
-  pluginState.consecutiveFailures = 0;
   updateAcceptedFromHealth(healthText);
 
-  // A healthy heartbeat is not evidence that a failed ingest was delivered.
-  // Keep the ingest failure visible until a successful ingest occurs.
-  if (pluginState.lastIngestError) {
+  // Heartbeat only confirms reachability. It must not clear an ingest alert.
+  if (pluginState.ingestFailureOutstanding) {
     await saveState();
     return;
   }
+  pluginState.status = "connected";
+  pluginState.lastError = null;
+  pluginState.consecutiveFailures = 0;
 
   if (hadAlert) {
     pluginState.alerted = false;
@@ -276,7 +276,7 @@ async function sendHeartbeat(active) {
   await ensurePluginStateLoaded();
   pluginState.monitoring = active;
 
-  if (!active && pluginState.alerted) {
+  if (!active && pluginState.alerted && !pluginState.ingestFailureOutstanding) {
     await clearMonitoringAlert();
   }
 
@@ -399,7 +399,9 @@ async function sendDirect(info, postData, result) {
 
     pluginState.sent += 1;
     pluginState.monitoring = true;
-    pluginState.lastIngestError = null;
+    // The transport is working again, but this does not prove that a
+    // previously failed packet was delivered. Retain lastIngestError as audit.
+    pluginState.ingestFailureOutstanding = false;
     pluginState.lastIngestSuccessAt = nowIso();
     await markPluginSuccess();
     return true;
@@ -409,6 +411,7 @@ async function sendDirect(info, postData, result) {
     pluginState.ingestFailures = Number(pluginState.ingestFailures || 0) + 1;
     pluginState.lastIngestError = String(e?.message || e);
     pluginState.lastIngestFailureAt = nowIso();
+    pluginState.ingestFailureOutstanding = true;
     await markPluginFailure(e, true);
     console.warn("KLB ingest failed", {
       reason: pluginState.lastIngestError,
